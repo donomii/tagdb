@@ -2,8 +2,6 @@
 package main
 
 import (
-    "github.com/donomii/tagdb/tagbrowser"
-	"dry"
 	"flag"
 	"fmt"
 	"log"
@@ -17,6 +15,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/donomii/tagdb/tagbrowser"
+	"github.com/ungerik/go-dry"
 )
 
 var noContents = false
