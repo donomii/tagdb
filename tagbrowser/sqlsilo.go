@@ -717,7 +717,7 @@ func (s *tagSilo) get_diskdb_symbol(aStr string) (int, error) {
 		var res int
 		s.count("sql_select")
 
-		err := s.dbHandle.QueryRow("select value from SymbolTable where id like ?", bytes(aStr)).Scan(&res)
+		err := s.dbHandle.QueryRow("select value from SymbolTable where id like ?", []byte(aStr)).Scan(&res)
 		if err != nil {
 			//s.LogChan["warning"] <- fmt.Sprintln("While trying to read  ", aStr, " from SymbolTable: ", err)
 		}
@@ -782,7 +782,7 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 					
 					defer stmt.Close()
 					
- 					_, err = stmt.Exec( s.next_string_index, bytes(aStr))
+ 					_, err = stmt.Exec( s.next_string_index, []byte(aStr))
 					//fmt.Printf("insert into StringTable(id, value) values(%v, %s)\n",s.next_string_index, aStr)
 					if err != nil {
 						s.LogChan["error"] <- fmt.Sprintln("While trying to insert ", aStr, " into StringTable: ", err)
@@ -798,7 +798,7 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 					
 					defer stmt.Close()
 					
-					_, err = stmt.Exec(bytes(aStr), s.next_string_index)
+					_, err = stmt.Exec([]byte(aStr), s.next_string_index)
 					//fmt.Printf("insert into SymbolTable(id, value) values(%s, %v)\n",aStr,  s.next_string_index)
 					if err != nil {
 						s.LogChan["error"] <- fmt.Sprintln("While trying to insert ", aStr, " into SymbolTable: ", err)
