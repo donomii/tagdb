@@ -600,7 +600,7 @@ func (s *tagSilo) getString(index int) string {
 			}
 
 			if val != "" {
-				s.string_cache[index] = val
+				//s.string_cache[index] = val
 			}
 			return val
 		}
