@@ -111,7 +111,7 @@ func handler(ctx *fetchbot.Context, res *http.Response, err error) {
 	rpcClient, err = jsonrpc.Dial("tcp", tagbrowser.ServerAddress)
 	if err != nil {
 		log.Printf("Failed to connect to %s, exiting\n", tagbrowser.ServerAddress)
-        return()
+        return
 	} else {
 
 		log.Printf("Connected to tagserver on %s\n", tagbrowser.ServerAddress)
