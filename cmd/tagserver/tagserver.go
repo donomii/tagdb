@@ -2,7 +2,7 @@
 package main
 
 import (
-	"donomii/tagbrowser"
+"github.com/donomii/tagdb/tagbrowser"
 	"net/http"
 	_ "net/http/pprof"
 	"time"

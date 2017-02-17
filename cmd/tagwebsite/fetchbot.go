@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"donomii/tagbrowser"
+"github.com/donomii/tagdb/tagbrowser"
 	"flag"
 	"fmt"
 	"io/ioutil"
