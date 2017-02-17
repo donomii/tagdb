@@ -2,7 +2,7 @@
 package main
 
 import (
-	"donomii/tagbrowser"
+"github.com/donomii/tagdb/tagbrowser"
 	"flag"
 	"fmt"
 	"log"
