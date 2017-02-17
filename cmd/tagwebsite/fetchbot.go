@@ -89,6 +89,11 @@ func handler(ctx *fetchbot.Context, res *http.Response, err error) {
 		fmt.Printf("error: %s\n", err)
 		return
 	}
+
+	if debug {
+		log.Println("Processing page: ", ctx.Cmd.URL())
+	}
+
 	defer res.Body.Close()
 	defer func() {
 		if r := recover(); r != nil {
