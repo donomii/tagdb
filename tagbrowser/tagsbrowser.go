@@ -24,7 +24,7 @@ var defaultManor *Manor
 
 var BoundariesRegex = regexp.MustCompile("\\b|\\p{Z}+|\\p{C}|\\s+|\\/+|\\.+|\\\\+|_+")
 
-var FragsRegex = regexp.MustCompile("\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+)")
+var FragsRegex = regexp.MustCompile(`(\s+|,+|;+|:+|"+|'+|\.|/+|\+|-+|_+|=+|}+|{+)`) //regexp.MustCompile("(\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+|:|,|\"|{|}|))")
 
 var FragsString = "\\b|\\p{Z}+|\\p{C}|\\s+|\\/+|\\.+|\\\\+|_+|\\\\(|\\\\)"
 
@@ -138,7 +138,7 @@ func calcRawScore(aStr string) (string, int) {
 }
 
 func RegSplit(text string, reg *regexp.Regexp) []string {
-
+/*
 	indexes := reg.FindAllStringIndex(text, -1)
 	laststart := 0
 	result := make([]string, len(indexes)+1)
@@ -148,6 +148,23 @@ func RegSplit(text string, reg *regexp.Regexp) []string {
 	}
 	result[len(indexes)] = text[laststart:len(text)]
 	return result
+*/
+
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+    text = reg.ReplaceAllString(text, " ")
+
+    result := strings.Split(text, " ")
+    log.Println("Split results:", result)
+    return result
+
 }
 func match_trie(string_table *patricia.Trie, key patricia.Prefix) bool {
 	defer func() {
@@ -280,10 +297,12 @@ func StartServer() {
 
 	//Blank entry at 0
 
+log.Println("Starting rpc server on ", ServerAddress)
 	go rpc_server(ServerAddress)
 	rpcClient, _ = jsonrpc.Dial("tcp", ServerAddress)
 
 	//time.Sleep(5 * time.Second)
+	log.Println("Loaded config: ", config)
 	defaultManor = createManor(config)
 	//silo = createSilo(false, preAllocSize, "1", 1000000)
 
