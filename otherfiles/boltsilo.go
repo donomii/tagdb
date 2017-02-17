@@ -3,19 +3,19 @@ package tagbrowser
 
 import (
 	"bytes"
-	"database/sql"
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
-
+	"github.com/boltdb/bolt"
+	"github.com/boltdb/coalescer"
 	"github.com/tchap/go-patricia/patricia"
 )
 
@@ -43,58 +43,34 @@ func (s *tagSilo) tagToRecordIDs(tagID int) []int {
 		return cache_val
 	} else {
 		s.count("tag_cache_miss")
-		var ret []byte
-		s.count("sql_select")
-
-		{
-			var retarr []int
-			//log.Printf("Fetching %v", tagID)
-			rows, err := s.dbHandle.Query("select recordid from TagToRecord where tagid like ?", tagID)
-			if err != nil {
-			if debug {
-				log.Printf("Failed to retrieve tag (%v) because %v", tagID, err)
+		key := []byte(fmt.Sprintf("%v", tagID))
+		retval := []int{}
+		s.count("boltdb_view")
+		s.dbHandle.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("TagToRecordTable"))
+			if b == nil {
+				log.Println("Failed to get bucket TagToRecordTable")
+				panic("Failed to get bucket TagToRecordTable")
 			}
-			return retarr
-			}
-			defer rows.Close()
+			//b = tx.Bucket([]byte("MyBucket"))
 
-			for rows.Next() {
-					var res int
-					if err := rows.Scan(&res); err != nil {
-							log.Fatal(err)
-					}
-					retarr = append(retarr, res)
-
-			}
-			//log.Printf("Would return %v\n", retarr)
-			return retarr
-		}
-
-		err := s.dbHandle.QueryRow("select value from TagToRecordTable where id like ?", tagID).Scan(&ret)
-		if err != nil {
-			if debug {
-				log.Printf("Failed to retrieve tag (%v) because %v", tagID, err)
-			}
-			return nil
-		} else {
-
-			var val []int
-			err = json.Unmarshal(ret, &val)
+			val := b.Get(key)
+			err := json.Unmarshal(val, &retval)
 			//When adding a record, we attempt to add it to each tag
 			//If we add a new tag, then there will be no record in this
 			//bucket for the new tag, and returning the empty list is fine
 			if debug {
 				if err != nil {
-					log.Printf("Failed to decode tag to record id list (%v) because %v, data is: %V", tagID, err, ret)
-					return nil
+					log.Printf("Failed to decode tag to record id list (%v) because %v, data is: %V", key, err, retval)
 				}
 			}
 
-			if val != nil {
-				s.tag_cache[tagID] = val
-			}
-			return val
+			return nil
+		})
+		if retval != nil {
+			s.tag_cache[tagID] = retval
 		}
+		return retval
 	}
 }
 
@@ -148,7 +124,7 @@ func (s *tagSilo) storeRecordWorker() {
 func (s *tagSilo) storePermanentRecordWorker() {
 	for aRecord := range s.permanentStoreCh {
 		if s.ReadOnly || !s.Operational {
-			s.permanentStoreCh <- aRecord //Push the current record back onto the queue
+			s.permanentStoreCh <- aRecord
 			//FIXME race condition against shutdown (monitorworker)
 			log.Println("StorePermanentRecordWorker exiting in silo ", s.id)
 			return
@@ -239,9 +215,8 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 	}
 	//FIXME this needs to search all silos?  Or do we just filter out dupes during the search consolidation phase?
 
-
-	//FIXME dupe checks are slowing inserts too much?
-	res := s.scanFileDatabase(searchPrint{aRecord.Fingerprint, fingerPrint{}}, 2, true)
+	//FIXME dupe checks are slowing inserts too much>?
+	res := s.scanFileDatabase(searchPrint{aRecord.Fingerprint, fingerPrint{}}, 10, true)
 	dupe := false
 	if len(res) > 0 {
 		for _, v := range res {
@@ -251,128 +226,70 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 		}
 	}
 
-
 	if dupe {
 		s.count("duplicates_rejected")
 		log.Printf("Attempt to insert a duplicate record.  This is not an error.")
 	} else {
 		s.Dirty()
-		s.count("db_update")
+		s.count("boltdb_update")
 
 		if debug {
 			log.Println("Attempting db update in storeFileRecord")
 		}
 		s.LockMe()
 		defer s.UnlockMe()
-		//s.LogChan["transport"] <-fmt.Sprintln("Storing record with ", len(aRecord.Fingerprint), " tags")
+		s.coalescer.Update(func(tx *bolt.Tx) error {
+			//s.LogChan["transport"] <-fmt.Sprintln("Storing record with ", len(aRecord.Fingerprint), " tags")
+			for _, v := range aRecord.Fingerprint {
+				//if !contains(tag2file[v], &line_elem) {
 
-		/*
-
-		for _, v := range aRecord.Fingerprint {
-			//if !contains(tag2file[v], &line_elem) {
-
-			recordIDs := s.tagToRecordIDs(v)
-			recordIDs = append(recordIDs, s.last_database_record)
-
-			key := []byte(fmt.Sprintf("%v", v))
-
-			val, jerr := json.Marshal(recordIDs)
-
-			if jerr == nil {
-
-				stmt, err := s.dbHandle.Prepare("insert or replace into TagToRecordTable(id, value) values(?, ?)")
-				stmt1, err1 := s.dbHandle.Prepare("update TagToRecordTable SET value = ? where id like ? ")
-				if err != nil {
-					s.LogChan["error"] <- fmt.Sprintln("While preparing to insert TagToRecordTable: ", err)
-				}
-				if err1 != nil {
-					s.LogChan["error"] <- fmt.Sprintln("While preparing to update TagToRecordTable: ", err1)
-				}
-				defer stmt.Close()
-				defer stmt1.Close()
-				_, err = stmt.Exec(key, val)
-				if err != nil {
-					s.LogChan["warning"] <- fmt.Sprintln("While trying to insert TagToRecordTable: ", err)
-				}
-				_, err1 = stmt1.Exec(val, key)
-				if err1 != nil {
-					s.LogChan["error"] <- fmt.Sprintf("Could not store record for key(%v) in TagToRecordTable: %v\n", key, err1)
-					return
-				}
-
-				s.count("sql_insert")
-				s.tag_cache[v] = recordIDs
-			} else {
-				s.LogChan["warning"] <- fmt.Sprintln("Failed to marshall json: %v", jerr)
-			}
-
-			if debug {
-				s.LogChan["warning"] <- fmt.Sprintln("Added record to tag %v (%v)", s.getString(v), v)
-			}
-
-			//}
-		}*/
-
-		val, _ := json.Marshal(aRecord)
-		stmt, err := s.dbHandle.Prepare("insert into RecordTable(id, value) values(?, ?)")
-		//stmt1, err1 := s.dbHandle.Prepare("update RecordTable SET value = ? where id like ? ")
-		if err != nil {
-			s.LogChan["error"] <- fmt.Sprintln("While preparing to insert RecordTable: ", err)
-		}
-		//if err1 != nil {
-		//	s.LogChan["error"] <- fmt.Sprintln("While preparing to update RecordTable: ", err1)
-		//}
-		defer stmt.Close()
-		//defer stmt1.Close()
-		_, err = stmt.Exec(key, val)
-		//fmt.Printf("insert into RecordTable(id, value) values(%v, %v)\n", key, val)
-		if err != nil {
-			s.LogChan["warning"] <- fmt.Sprintln("While trying to insert RecordTable: ", err)
-		}
-		//_, err1 = stmt1.Exec(val, key)
-		//if err1 != nil {
-		//	s.LogChan["error"] <- fmt.Sprintln("While trying to insert RecordTable: ", err1)
-		//}
-
-		s.count("sql_insert")
-
-		s.record_cache[s.last_database_record] = aRecord
-		if err != nil {
-			s.LogChan["warning"] <- fmt.Sprintln("Could not store record for key(%v): %v\n", key, err)
-		}
-		//log.Printf("Record %v inserted: %v",s.last_database_record,  val)
-
-				{
-		stmt, err := s.dbHandle.Prepare("insert or ignore into TagToRecord(tagid, recordid) values(?, ?)")
-		defer stmt.Close()
-		for _, v := range aRecord.Fingerprint {
-			_, err = stmt.Exec(v, s.last_database_record)
-			//fmt.Printf("insert into TagToRecord(tagid, recordid) values(%v, %v)\n", v, s.last_database_record)
-			s.count("sql_insert")
-			if err != nil {
-					s.LogChan["warning"] <- fmt.Sprintln("While trying to insert TagToRecord: ", err)
-				}
 				recordIDs := s.tagToRecordIDs(v)
-			recordIDs = append(recordIDs, s.last_database_record)
+				recordIDs = append(recordIDs, s.last_database_record)
 
+				key := []byte(fmt.Sprintf("%v", v))
+				b, err := tx.CreateBucketIfNotExists([]byte("TagToRecordTable"))
+				if err != nil {
+					log.Println("Could not get bucket TagToRecordTable: ", err)
+				}
 
+				val, jerr := json.Marshal(recordIDs)
 
-				s.tag_cache[v] = recordIDs
+				if jerr == nil {
+					s.count("boltdb_put")
+					err = b.Put(key, val)
+					s.tag_cache[v] = recordIDs
+				} else {
+					log.Printf("Failed to marshall json: %v", jerr)
+				}
+				if err != nil {
+					log.Printf("Could not store record for key(%v): %v\n", key, err)
+					return err
+				}
 
+				if debug {
+					log.Printf("Added record to tag %v (%v)", s.getString(v), v)
+				}
 
-		}
+				//}
+			}
 
-		//log.Printf("Record inserted")
-		}
+			b, err := tx.CreateBucketIfNotExists([]byte("RecordTable"))
+			if err != nil {
+				log.Println("Could not get bucket RecordTable: ", err)
+			}
 
-		{
-
-		}
-
-		return
+			val, _ := json.Marshal(aRecord)
+			s.count("boltdb_put")
+			err = b.Put(key, val)
+			s.record_cache[s.last_database_record] = aRecord
+			if err != nil {
+				log.Printf("Could not store record for key(%v): %v\n", key, err)
+			}
+			return err
+		})
 
 		if debug {
-			s.LogChan["debug"] <- fmt.Sprintln("storeFileRecord waiting for input")
+			log.Println("storeFileRecord waiting for input")
 		}
 	}
 
@@ -422,29 +339,35 @@ func (s *tagSilo) getDiskRecord(recordID int) record {
 		if s.dbHandle == nil {
 			panic("nil dbhandle!")
 		}
-		s.count("sql_select")
+		s.count("boltdb_view")
+		s.dbHandle.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("RecordTable"))
+			if b == nil {
+				log.Println("Failed to get bucket RecordTable")
+				return fmt.Errorf("No bucket")
+			}
+			//b = tx.Bucket([]byte("MyBucket"))
 
-		err = s.dbHandle.QueryRow("select value from RecordTable where id like ?", key).Scan(&val)
-		if err != nil {
-			s.LogChan["error"] <- fmt.Sprintln("While trying to read ", recordID, " from RecordTable: ", err)
-			return retval
-		}
+			val = b.Get(key)
 
+			return nil
+		})
 		if val != nil {
 
 			err = json.Unmarshal(val, &retval)
 			if err != nil {
 				//time.Sleep(1.0 * time.Second)
 
-				s.LogChan["warning"] <- fmt.Sprintf("Failed to decode record(%v) because %v, data is: %V", key, err, retval)
+				log.Printf("Failed to decode record(%v) because %v, data is: %V", key, err, retval)
 
 				//retval = s.getRecord(recordID)
-				s.record_cache[recordID] = retval
+
 			}
 		}
 		if debug {
 			log.Printf("Fetched from database: %v\n", retval)
 		}
+		s.record_cache[recordID] = retval
 		return retval
 	}
 }
@@ -513,10 +436,7 @@ func (s *tagSilo) scanRealFileDatabase(aFing searchPrint, maxResults int, exactM
 	//		//return s.scanFileDatabase(aFing, maxResults, exactMatch)
 	//	}
 	//}()
-
-	if debug {
-		log.Println("Starting database scan")
-	}
+	//log.Println("Starting database scan")
 	results := resultRecordCollection{}
 	currentLowest := 99999
 	recordIDs := []int{}
@@ -527,9 +447,6 @@ func (s *tagSilo) scanRealFileDatabase(aFing searchPrint, maxResults int, exactM
 
 			recordIDs = append(recordIDs, elem)
 		}
-	}
-	if debug {
-		log.Printf("Found %v records that match search", len(recordIDs))
 	}
 
 	for _, recordID := range recordIDs {
@@ -556,9 +473,7 @@ func (s *tagSilo) scanRealFileDatabase(aFing searchPrint, maxResults int, exactM
 			}
 		}
 	}
-	if debug {
-		log.Println("Finished database scan")
-	}
+	//log.Println("Finished database scan")
 	//log.Printf("Starting results sort")
 	sort.Sort(results)
 	//log.Println("Finished results sort")
@@ -592,15 +507,20 @@ func (s *tagSilo) getString(index int) string {
 			return cache_val
 		} else {
 			s.count("string_cache_miss")
-			s.count("sql_select")
+			s.count("boltdb_view")
+			s.dbHandle.View(func(tx *bolt.Tx) error {
+				b := tx.Bucket([]byte("StringTable"))
+				if b == nil {
+					log.Println("Failed to get bucket StringTable")
+					return fmt.Errorf("No bucket")
+				}
+				//b = tx.Bucket([]byte("MyBucket"))
 
-			err := s.dbHandle.QueryRow("select value from StringTable where id like ?", index).Scan(&val)
-			if err != nil {
-				//s.LogChan["warning"] <- fmt.Sprintln("While trying to read StringTable: ", err)
-			}
-
+				val = string(b.Get([]byte(fmt.Sprintf("%v", index))))
+				return nil
+			})
 			if val != "" {
-				//s.string_cache[index] = val
+				s.string_cache[index] = val
 			}
 			return val
 		}
@@ -610,7 +530,7 @@ func (s *tagSilo) getString(index int) string {
 func (s *tagSilo) get_memdb_symbol(aStr string) (int, error) {
 	if debug {
 		//log.Printf("Silo: %V\n", s)
-		//log.Printf("string: %v\n", aStr)
+		log.Printf("string: %V\n", aStr)
 	}
 
 	if s == nil {
@@ -714,18 +634,27 @@ func (s *tagSilo) get_diskdb_symbol(aStr string) (int, error) {
 
 	} else {
 
-		var res int
-		s.count("sql_select")
-
-		err := s.dbHandle.QueryRow("select value from SymbolTable where id like ?", []byte(aStr)).Scan(&res)
-		if err != nil {
-			//s.LogChan["warning"] <- fmt.Sprintln("While trying to read  ", aStr, " from SymbolTable: ", err)
-		}
-
-		if err == nil {
-			retval = int(res)
-		} else {
-			//log.Printf("Error retrieving symbol for '%v': %v", aStr, err)
+		var res []byte
+		s.count("boltdb_view")
+		viewErr := s.dbHandle.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket([]byte("SymbolTable"))
+			if b == nil {
+				log.Println("Failed to get bucket SymbolTable")
+				panic("Failed to get bucket SymbolTable")
+			}
+			res = b.Get([]byte(aStr))
+			if res != nil {
+				val, err := strconv.ParseInt(string(res), 10, 0)
+				if err != nil {
+					log.Println("Could not parse int, because ", err)
+				} else {
+					retval = int(val)
+				}
+			}
+			return nil
+		})
+		if viewErr != nil {
+			log.Printf("Error retrieving symbol for %v: %v", aStr, viewErr)
 		}
 	}
 	return retval, nil
@@ -752,59 +681,29 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 		if val != 0 {
 			return val
 		} else {
-			if debug {
-						log.Println("Attempting lock in get_or_create_symbol")
-					}
-					s.LockMe()
-					defer func() {
-						s.UnlockMe()
-						if debug {
-							log.Println("Released lock in get_or_create_symbol")
-						}
-					}()
-					if debug {
-						log.Println("Got lock in get_or_create_symbol")
-					}
+
 			val, _ := s.get_symbol(aStr)
 			if val != 0 {
 				return val
 			} else {
 				s.next_string_index = s.next_string_index + 1
 				if !s.memory_db {
+					//log.Println("Attempting lock in get_or_create_symbol")
+					//s.writeMutex.Lock()
+					//defer func() { s.writeMutex.Unlock(); log.Println("Released lock in get_or_create_symbol") }()
+					//log.Println("Got lock in get_or_create_symbol")
+					s.count("boltdb_update")
+					s.coalescer.Update(func(tx *bolt.Tx) error {
+						b, err := tx.CreateBucketIfNotExists([]byte("StringTable"))
+						s.count("boltdb_put")
+						err = b.Put([]byte(fmt.Sprintf("%v", s.next_string_index)), []byte(aStr))
 
-					s.count("sql_insert")
+						b, err = tx.CreateBucketIfNotExists([]byte("SymbolTable"))
+						s.count("boltdb_put")
+						err = b.Put([]byte(aStr), []byte(fmt.Sprintf("%v", s.next_string_index)))
 
-					stmt, err := s.dbHandle.Prepare("insert into StringTable(id, value) values(?, ?)")
-
-					if err != nil {
-						s.LogChan["error"] <- fmt.Sprintln("While preparing to insert ", aStr, " into  StringTable: ", err)
-					}
-
-					defer stmt.Close()
-
- 					_, err = stmt.Exec( s.next_string_index, []byte(aStr))
-					//fmt.Printf("insert into StringTable(id, value) values(%v, %s)\n",s.next_string_index, aStr)
-					if err != nil {
-						s.LogChan["error"] <- fmt.Sprintln("While trying to insert ", aStr, " into StringTable: ", err)
-					}
-
-
-					s.count("sql_insert")
-					stmt, err = s.dbHandle.Prepare("insert into SymbolTable(id, value) values(?, ?)")
-
-					if err != nil {
-						s.LogChan["error"] <- fmt.Sprintln("While preparing to insert  ", aStr, " into SymbolTable: ", err)
-					}
-
-					defer stmt.Close()
-
-					_, err = stmt.Exec([]byte(aStr), s.next_string_index)
-					//fmt.Printf("insert into SymbolTable(id, value) values(%s, %v)\n",aStr,  s.next_string_index)
-					if err != nil {
-						s.LogChan["error"] <- fmt.Sprintln("While trying to insert ", aStr, " into SymbolTable: ", err)
-					}
-
-
+						return err
+					})
 				} else {
 					s.string_table.Insert(patricia.Prefix(aStr), s.next_string_index)
 					if s.next_string_index < len(s.reverse_string_table)-1 {
@@ -984,9 +883,7 @@ func (s *tagSilo) makeFingerprint(fragments []string) fingerPrint {
 				index = index + 1
 			}
 		} else {
-			if len(f) > maxTagLength {
-				s.LogChan["warning"] <- fmt.Sprintln("Rejecting tag as too long: ", f)
-			}
+			//s.LogChan["error"] <-fmt.Sprintln("Rejecting tag as too long or short: ", f)
 		}
 
 	}
@@ -1082,8 +979,8 @@ func (s *tagSilo) monitorSiloWorker() {
 			}
 			if s.ReadOnly && s.offload_index == s.last_database_record {
 				//Fixme, race condition against the worker threads
-				log.Println(s.id, " moving to shutdown in 5 seconds")
-				time.Sleep(time.Second * 5.0)
+				log.Println(s.id, " moving to shutdown in 20 seconds")
+				time.Sleep(time.Second * 20.0)
 				s.Operational = false
 				log.Println(s.id, " no longer operational")
 				return
@@ -1173,46 +1070,10 @@ func (s *tagSilo) Checkpoint() {
 
 func (s *tagSilo) checkpointWorker() {
 	for {
-		time.Sleep(time.Second * 60.0)
+		time.Sleep(time.Second * 300.0)
 		if s.dirty && s.Operational {
 			s.Checkpoint()
-			log.Println("Checkpoint complete ", s.filename)
-		}
-		if !s.Operational {
-			return
-		}
-	}
-}
-
-func (s *tagSilo) SQLCommitpoint() {
-
-}
-func (s *tagSilo) SQLCommitWorker() {
-	for {
-		var err error
-		s.LockMe()
-		//s.transactionHandle, err = s.dbHandle.Begin()
-		s.UnlockMe()
-		if err != nil {
-			log.Fatal("Could not start transaction!")
-		}
-		time.Sleep(time.Second * 15.0)
-
-		//s.transactionHandle.Commit()
-		s.transactionHandle = nil
-
-		if s.dirty && s.Operational {
-			//s.Checkpoint()
-			s.LockMe()
-			sqlStmt := `PRAGMA wal_checkpoint(TRUNCATE)`
-			s.UnlockMe()
-
-		_, err = s.dbHandle.Exec(sqlStmt)
-		if err != nil {
-			s.LogChan["error"] <- fmt.Sprintf("Performing PRAGMA - %q: %s\n", err, sqlStmt)
-		}
-
-			log.Println("SQL COMMIT complete ", s.filename)
+			//log.Println("Checkpoint complete ", s.filename)
 		}
 		if !s.Operational {
 			return
@@ -1301,97 +1162,73 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 
 		log.Printf("Opening silo %v", silo.filename)
 		var err error
-
-		db, err := sql.Open("sqlite3", silo.filename)
+		silo.dbHandle, err = bolt.Open(silo.filename, 0600, nil)
+		log.Println("Opened file")
+		//silo.dbHandle.NoSync = true
 		if err != nil {
 			log.Fatal(err)
 		}
-		silo.dbHandle = db
 
-		log.Printf("Opened file %v", silo.filename)
-
-		sqlStmt := `PRAGMA synchronous = OFF;
-		PRAGMA journal_mode = MEMORY;
-		`
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			silo.LogChan["error"] <- fmt.Sprintf("Performing PRAGMA - %q: %s\n", err, sqlStmt)
+		c, cerr := coalescer.New(silo.dbHandle, 10, 100.0*time.Millisecond)
+		if cerr != nil {
+			log.Println("Could not create coalescer")
+			os.Exit(1)
 		}
-		//sqlStmt = `create table IF NOT EXISTS TagToRecord (tagid int not null, recordid int not null, UNIQUE(tagid, recordid));`
-		sqlStmt = `create table IF NOT EXISTS TagToRecord (tagid int not null, recordid int not null);`
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			silo.LogChan["error"] <- fmt.Sprintf("Creating TagToRecord - %q: %s\n", err, sqlStmt)
-		}
+		silo.coalescer = c
 
-
-		sqlStmt = `create table IF NOT EXISTS StringTable (id int not null primary key, value string not null);`
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			silo.LogChan["error"] <- fmt.Sprintf("Creating StringTable - %q: %s\n", err, sqlStmt)
-		}
-
-		sqlStmt = `create table IF NOT EXISTS SymbolTable (id string not null primary key, value int not null);`
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			silo.LogChan["error"] <- fmt.Sprintf("Creating SymbolTable - %q: %s\n", err, sqlStmt)
-		}
-
-		sqlStmt = `create table IF NOT EXISTS RecordTable (id int not null primary key, value blob not null);`
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			silo.LogChan["error"] <- fmt.Sprintf("Creating RecordTable - %q: %s\n", err, sqlStmt)
-		}
-
-		sqlStmt = `create table IF NOT EXISTS TagToRecordTable (id int not null primary key, value int not null);`
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			silo.LogChan["error"] <- fmt.Sprintf("Creating TagToRecordTable - %q: %s\n", err, sqlStmt)
-		}
-
-		rows, err := db.Query("select id, value from RecordTable")
-		if err != nil {
-			silo.LogChan["database"] <- fmt.Sprintf("Reading from table RecordTable", err)
-		}
-
-		for rows.Next() {
-			var k int
-			var name string
-			rows.Scan(&k, &name)
-			var val = k
-			//val, err := strconv.ParseInt(string(k), 10, 0)
+		silo.coalescer.Update(func(tx *bolt.Tx) error {
+			silo.LogChan["file"] <- fmt.Sprintln("Setting up bolt database")
+			stringBucket, err := tx.CreateBucketIfNotExists([]byte("StringTable"))
 			if err != nil {
-				silo.LogChan["error"] <- fmt.Sprintln("Could not parse int, because ", err)
-			} else {
-				if int(val) > silo.last_database_record {
-					silo.last_database_record = int(val)
-				}
+				silo.LogChan["error"] <- fmt.Sprintf("Error creating buckets: %v", err)
 			}
-
-		}
-		rows.Close()
-
-		rows, err = db.Query("select id from StringTable")
-		if err != nil {
-			silo.LogChan["database"] <- fmt.Sprintf("Reading from table StringTable", err)
-		}
-
-		for rows.Next() {
-			var k int
-			rows.Scan(&k)
+			_, err = tx.CreateBucketIfNotExists([]byte("SymbolTable"))
 			if err != nil {
-				silo.LogChan["error"] <- fmt.Sprintln("Could not parse int, because ", err)
-			} else {
-				if k > silo.next_string_index {
-					silo.next_string_index = k
-				}
+				silo.LogChan["error"] <- fmt.Sprintf("Error creating buckets: %v", err)
 			}
+			var recordBucket *bolt.Bucket
+			recordBucket, err = tx.CreateBucketIfNotExists([]byte("RecordTable"))
+			if err != nil {
+				silo.LogChan["error"] <- fmt.Sprintf("Error creating buckets: %v", err)
+			}
+			_, err = tx.CreateBucketIfNotExists([]byte("TagToRecordTable"))
+			if err != nil {
+				silo.LogChan["error"] <- fmt.Sprintf("Error creating buckets: %v", err)
+			}
+			//log.Println("Buckets created")
+			//We should store this properly
+			recordBucket.ForEach(func(k, v []byte) error {
+				if k != nil {
+					val, err := strconv.ParseInt(string(k), 10, 0)
+					if err != nil {
+						silo.LogChan["error"] <- fmt.Sprintln("Could not parse int, because ", err)
+					} else {
+						if int(val) > silo.last_database_record {
+							silo.last_database_record = int(val)
+						}
+					}
+				}
 
-		}
-		rows.Close()
-		//log.Println("Buckets created")
-		//We should store this properly
+				return nil
+			})
+			//We should store this properly
+			stringBucket.ForEach(func(k, v []byte) error {
+				if k != nil {
+					val, err := strconv.ParseInt(string(k), 10, 0)
+					if err != nil {
+						silo.LogChan["error"] <- fmt.Sprintln("Could not parse int, because ", err)
+					} else {
+						if int(val) > silo.next_string_index {
+							silo.next_string_index = int(val)
+						}
+					}
+				}
 
+				return nil
+			})
+
+			return err
+		})
 		go silo.storeFileRecordWorker()
 	}
 	silo.threadsWait.Add(1)
@@ -1410,8 +1247,6 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 	} else {
 		silo.threadsWait.Add(1)
 		go silo.storePermanentRecordWorker()
-		silo.threadsWait.Add(1)
-		go silo.SQLCommitWorker()
 	}
 
 	silo.Operational = true

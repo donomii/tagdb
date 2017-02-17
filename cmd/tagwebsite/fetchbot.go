@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"donomii/tagbrowser"
+"github.com/donomii/tagdb/tagbrowser"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -89,6 +89,11 @@ func handler(ctx *fetchbot.Context, res *http.Response, err error) {
 		fmt.Printf("error: %s\n", err)
 		return
 	}
+
+	if debug {
+		log.Println("Processing page: ", ctx.Cmd.URL())
+	}
+
 	defer res.Body.Close()
 	defer func() {
 		if r := recover(); r != nil {
@@ -106,7 +111,7 @@ func handler(ctx *fetchbot.Context, res *http.Response, err error) {
 	rpcClient, err = jsonrpc.Dial("tcp", tagbrowser.ServerAddress)
 	if err != nil {
 		log.Printf("Failed to connect to %s, exiting\n", tagbrowser.ServerAddress)
-		os.Exit(1)
+        return
 	} else {
 
 		log.Printf("Connected to tagserver on %s\n", tagbrowser.ServerAddress)

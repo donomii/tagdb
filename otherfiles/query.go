@@ -2,12 +2,11 @@
 package main
 
 import (
-"github.com/donomii/tagdb/tagbrowser"
+	"donomii/tagbrowser"
 	"flag"
 	"fmt"
 	"log"
 	"net/rpc/jsonrpc"
-	"os"
 	"strings"
 )
 
@@ -52,20 +51,18 @@ func status() {
 	if err != nil {
 		log.Fatal("RPC error:", err)
 	}
-	log.Println("General statistics and settings")
-	log.Println("Status: ", *sreply)
+	fmt.Println("Status: ", *sreply)
 
 	hreply := &tagbrowser.HistoReply{}
-	log.Println("Fetching Histo Stats")
+	log.Println("Fetching status")
 	err = client.Call("TagResponder.HistoStatus", args, hreply)
 	log.Println("Received status")
 	if err != nil {
 		log.Fatal("RPC error:", err)
 	}
-	log.Println("Number of files the tag occurred in : Number of tags with this occurrence", hreply)
-	for i := 0; i < 50; i = i + 1 {
-		fmt.Printf("%d: %v\n", i, hreply.TagsToFilesHisto[fmt.Sprintf("%d", i)])
-	}
+	fmt.Println("Status: ", hreply)
+	fmt.Printf("0: %v\n1: %v\n2: %v\n3: %v\n4: %v\n5: %v\n6: %v\n7: %v\n8: %v\n", hreply.TagsToFilesHisto["0"], hreply.TagsToFilesHisto["1"], hreply.TagsToFilesHisto["2"], hreply.TagsToFilesHisto["3"], hreply.TagsToFilesHisto["4"], hreply.TagsToFilesHisto["5"], hreply.TagsToFilesHisto["6"], hreply.TagsToFilesHisto["7"], hreply.TagsToFilesHisto["8"])
+
 	treply := &tagbrowser.TopTagsReply{}
 	log.Println("Fetching status")
 	err = client.Call("TagResponder.TopTagsStatus", args, treply)
@@ -73,32 +70,20 @@ func status() {
 	if err != nil {
 		log.Fatal("RPC error:", err)
 	}
-	fmt.Println("Top tags, by the number of files they occur in: \n")
-	for k, v := range treply.TopTags {
-		log.Println(k, ":", v)
-	}
+	fmt.Println("Status: ", *treply)
+
 	log.Println("Check complete")
 }
 
 var completeMatch = false
 
 func main() {
-	var shutdown bool
 	fetchStatus := false
 	displayFingerprint := false
-	flag.StringVar(&tagbrowser.ServerAddress, "server", tagbrowser.ServerAddress, fmt.Sprintf("Server IP and Port.  Default: %s", tagbrowser.ServerAddress))
 	flag.BoolVar(&completeMatch, "completeMatch", false, "Do not return partial matches")
 	flag.BoolVar(&fetchStatus, "status", false, "Report status")
-	flag.BoolVar(&shutdown, "shutdown", false, "Shutdown the server")
 	flag.BoolVar(&displayFingerprint, "fingerprint", false, "Display the tag fingerprint for each result")
 	flag.Parse()
-	if shutdown {
-		client, _ := jsonrpc.Dial("tcp", tagbrowser.ServerAddress)
-		args := &tagbrowser.Args{"", 0}
-		sreply := &tagbrowser.StatusReply{}
-		client.Call("TagResponder.Shutdown", args, sreply)
-		os.Exit(0)
-	}
 	terms := flag.Args()
 	if len(terms) < 1 {
 		fmt.Println("Use: query.exe  < --completeMatch >  search terms")

@@ -2,19 +2,16 @@
 package main
 
 import (
-"github.com/donomii/tagdb/tagbrowser"
+	"donomii/tagbrowser"
 	"net/http"
 	_ "net/http/pprof"
 	"time"
-	"runtime"
 )
 
 func main() {
-	runtime.GOMAXPROCS(20) // runtime.GOMAXPROCS(2) 
 	tagbrowser.StartServer()
 	http.ListenAndServe("localhost:6060", nil)
-	for {
-		time.Sleep(100.0 * time.Millisecond)
-		//log.Println("Blup")
+	for i := 0; i < 1; i = 0 {
+		time.Sleep(1 * time.Second)
 	}
 }

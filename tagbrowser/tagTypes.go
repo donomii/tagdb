@@ -8,7 +8,6 @@ import (
 	"encoding/gob"
 	"sync"
 
-	"github.com/boltdb/coalescer"
 	"github.com/tchap/go-patricia/patricia"
 )
 
@@ -63,7 +62,6 @@ type tagSilo struct {
 	filename             string
 	dbHandle             *sql.DB
 	transactionHandle    driver.Tx
-	coalescer            *coalescer.Coalescer
 	recordCh             chan record
 	permanentStoreCh     chan RecordTransmittable
 	InputRecordCh        chan RecordTransmittable
