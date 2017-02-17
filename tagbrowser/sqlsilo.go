@@ -57,19 +57,19 @@ func (s *tagSilo) tagToRecordIDs(tagID int) []int {
 			return retarr
 			}
 			defer rows.Close()
-			
+
 			for rows.Next() {
 					var res int
 					if err := rows.Scan(&res); err != nil {
 							log.Fatal(err)
 					}
 					retarr = append(retarr, res)
-					
+
 			}
 			//log.Printf("Would return %v\n", retarr)
 			return retarr
 		}
-		
+
 		err := s.dbHandle.QueryRow("select value from TagToRecordTable where id like ?", tagID).Scan(&ret)
 		if err != nil {
 			if debug {
@@ -239,7 +239,7 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 	}
 	//FIXME this needs to search all silos?  Or do we just filter out dupes during the search consolidation phase?
 
-	
+
 	//FIXME dupe checks are slowing inserts too much?
 	res := s.scanFileDatabase(searchPrint{aRecord.Fingerprint, fingerPrint{}}, 2, true)
 	dupe := false
@@ -251,7 +251,7 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 		}
 	}
 
-	
+
 	if dupe {
 		s.count("duplicates_rejected")
 		log.Printf("Attempt to insert a duplicate record.  This is not an error.")
@@ -267,7 +267,7 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 		//s.LogChan["transport"] <-fmt.Sprintln("Storing record with ", len(aRecord.Fingerprint), " tags")
 
 		/*
-		
+
 		for _, v := range aRecord.Fingerprint {
 			//if !contains(tag2file[v], &line_elem) {
 
@@ -341,7 +341,7 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 			s.LogChan["warning"] <- fmt.Sprintln("Could not store record for key(%v): %v\n", key, err)
 		}
 		//log.Printf("Record %v inserted: %v",s.last_database_record,  val)
-		
+
 				{
 		stmt, err := s.dbHandle.Prepare("insert or ignore into TagToRecord(tagid, recordid) values(?, ?)")
 		defer stmt.Close()
@@ -355,20 +355,20 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 				recordIDs := s.tagToRecordIDs(v)
 			recordIDs = append(recordIDs, s.last_database_record)
 
-		
-				
+
+
 				s.tag_cache[v] = recordIDs
-			
-		
+
+
 		}
-		
+
 		//log.Printf("Record inserted")
 		}
-		
+
 		{
-		
+
 		}
-		
+
 		return
 
 		if debug {
@@ -610,7 +610,7 @@ func (s *tagSilo) getString(index int) string {
 func (s *tagSilo) get_memdb_symbol(aStr string) (int, error) {
 	if debug {
 		//log.Printf("Silo: %V\n", s)
-		log.Printf("string: %V\n", aStr)
+		//log.Printf("string: %v\n", aStr)
 	}
 
 	if s == nil {
@@ -771,39 +771,39 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 			} else {
 				s.next_string_index = s.next_string_index + 1
 				if !s.memory_db {
-					
+
 					s.count("sql_insert")
 
 					stmt, err := s.dbHandle.Prepare("insert into StringTable(id, value) values(?, ?)")
-					
+
 					if err != nil {
 						s.LogChan["error"] <- fmt.Sprintln("While preparing to insert ", aStr, " into  StringTable: ", err)
 					}
-					
+
 					defer stmt.Close()
-					
+
  					_, err = stmt.Exec( s.next_string_index, []byte(aStr))
 					//fmt.Printf("insert into StringTable(id, value) values(%v, %s)\n",s.next_string_index, aStr)
 					if err != nil {
 						s.LogChan["error"] <- fmt.Sprintln("While trying to insert ", aStr, " into StringTable: ", err)
 					}
-					
+
 
 					s.count("sql_insert")
 					stmt, err = s.dbHandle.Prepare("insert into SymbolTable(id, value) values(?, ?)")
-					
+
 					if err != nil {
 						s.LogChan["error"] <- fmt.Sprintln("While preparing to insert  ", aStr, " into SymbolTable: ", err)
 					}
-					
+
 					defer stmt.Close()
-					
+
 					_, err = stmt.Exec([]byte(aStr), s.next_string_index)
 					//fmt.Printf("insert into SymbolTable(id, value) values(%s, %v)\n",aStr,  s.next_string_index)
 					if err != nil {
 						s.LogChan["error"] <- fmt.Sprintln("While trying to insert ", aStr, " into SymbolTable: ", err)
 					}
-					
+
 
 				} else {
 					s.string_table.Insert(patricia.Prefix(aStr), s.next_string_index)
@@ -1197,21 +1197,21 @@ func (s *tagSilo) SQLCommitWorker() {
 			log.Fatal("Could not start transaction!")
 		}
 		time.Sleep(time.Second * 15.0)
-		
+
 		//s.transactionHandle.Commit()
 		s.transactionHandle = nil
-		
+
 		if s.dirty && s.Operational {
 			//s.Checkpoint()
 			s.LockMe()
 			sqlStmt := `PRAGMA wal_checkpoint(TRUNCATE)`
 			s.UnlockMe()
-		
+
 		_, err = s.dbHandle.Exec(sqlStmt)
 		if err != nil {
 			s.LogChan["error"] <- fmt.Sprintf("Performing PRAGMA - %q: %s\n", err, sqlStmt)
 		}
-		
+
 			log.Println("SQL COMMIT complete ", s.filename)
 		}
 		if !s.Operational {
@@ -1353,7 +1353,7 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 		if err != nil {
 			silo.LogChan["database"] <- fmt.Sprintf("Reading from table RecordTable", err)
 		}
-		
+
 		for rows.Next() {
 			var k int
 			var name string
@@ -1375,7 +1375,7 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 		if err != nil {
 			silo.LogChan["database"] <- fmt.Sprintf("Reading from table StringTable", err)
 		}
-		
+
 		for rows.Next() {
 			var k int
 			rows.Scan(&k)
