@@ -95,6 +95,7 @@ type tagSilo struct {
 	dirty                bool
 	LockLog              chan string
 	LogChan              map[string]chan string
+    Store                *SiloStore
 }
 
 type tomlConfig struct {
@@ -154,3 +155,7 @@ type ResultRecordTransmittable struct {
 
 type resultRecordCollection []resultRecord
 type ResultRecordTransmittableCollection []ResultRecordTransmittable
+
+type SiloStore struct {
+    Db *sql.DB
+}
