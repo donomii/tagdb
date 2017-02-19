@@ -1,0 +1,43 @@
+
+[server]
+address = "192.168.1.1"
+ports = 6781
+
+[farms]
+
+  # You can add as many farms as you like. Make sure they have different names and locations
+
+
+  #[farms.beta]
+  #location = "g:/tagtest"
+  #silos = 10
+  #mode="disk"
+  #offload=false
+
+
+  [farms.delta]
+  location = "c:/tagtest"
+  silos = 2
+  mode="disk"
+  offload=false
+
+  #[farms.alpha]
+  #location = "c:/tagtest"
+  #silos = 2
+  #mode="disk"
+  #offload=false
+
+
+  #[farms.alpha]
+  #location = "g:/tagtest"  #Ignored for memory DBs, but useful for debugging
+ # silos = 0
+  #mode="memory"
+  #offload=true
+  #size=50000	#Maximum size.  Probably not worth going over 50k records, but depends on system.  Ignored for disk DBs
+
+  #[farms.gamma]
+  #location = "persistDB"  #Ignored for memory DBs, but useful for #debugging
+  #silos = 0
+  #mode="memory"
+  #offload=true
+  #size=50000	#Maximum size.  Probably not worth going over 50k records, but depends on system.  Ignored for disk DBs
