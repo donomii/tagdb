@@ -97,6 +97,9 @@ func (t *TagResponder) PredictString(args *Args, reply *StringListReply) error {
 }
 
 func (t *TagResponder) InsertRecord(args *InsertArgs, reply *SuccessReply) error {
+    if debug {
+        log.Println("Inserting record Handler", args)
+    }
 	//silo.LockMe()
 	//defer func() { silo.UnlockMe() }()
 
@@ -117,16 +120,24 @@ func (t *TagResponder) InsertRecord(args *InsertArgs, reply *SuccessReply) error
 		}
 	}
 
+    if debug {
+        log.Println("Finished inserting record handler", reply)
+    }
 	return nil
 }
 
 func InsertRecord(args *InsertArgs, reply *SuccessReply) error {
-
+    if debug {
+        log.Println("Inserting record action", args)
+    }
 	rec := RecordTransmittable{args.Name, args.Position, args.Tags}
 	defaultManor.SubmitRecord(rec)
 
 	reply.Success = true
 	reply.Reason = ""
+    if debug {
+        log.Println("Finished inserting record action", reply)
+    }
 	return nil
 }
 
@@ -229,9 +240,13 @@ func rpc_server(serverAddress string) {
 		if err != nil {
 			log.Fatal(err)
 		}
-		//log.Println("Got connection")
+		if debug {
+            log.Println("Got connection")
+        }
 		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
-		//log.Println("Sent response, probably")
+		if debug {
+		    log.Println("Sent response, probably")
+        }
 	}
 
 }
