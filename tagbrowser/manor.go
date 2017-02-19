@@ -43,7 +43,13 @@ func (m *Manor) Shutdown() {
 }
 
 func (m *Manor) SubmitRecord(r RecordTransmittable) {
+    if debug {
+        log.Println("Submitting record")
+    }
 	m.recordCh <- r
+    if debug {
+        log.Println("Record submitted")
+    }
 }
 
 func (m *Manor) scanFileDatabase(searchString string, maxResults int, exactMatch bool) []ResultRecordTransmittable {
