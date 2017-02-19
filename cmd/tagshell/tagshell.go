@@ -3,6 +3,10 @@ package main
 
 import (
 "github.com/donomii/tagdb/tagbrowser"
+    "runtime"
+    "strconv"
+    "io"
+    "bufio"
 	"flag"
 	"fmt"
 	"log"
@@ -18,8 +22,6 @@ import (
 	"sync"
 )
 
-var linux = false
-var windows = true
 
 var serverActive = false
 
@@ -44,6 +46,20 @@ var predictResults []string
 
 var refreshMutex sync.Mutex
 
+
+func FetchLine(f string, lineNum int) (line string, lastLine int, err error) {
+    r, _ := os.Open(f)
+    sc := bufio.NewScanner(r)
+    for sc.Scan() {
+        lastLine++
+        if lastLine == lineNum {
+            return sc.Text(), lastLine, sc.Err()
+        }
+    }
+    return line, lastLine, io.EOF
+}
+
+//Contact server with search string
 func search(searchTerm string, numResults int) []tagbrowser.ResultRecordTransmittable {
 	statuses["Status"] = "Searching"
 	log.Println("Searching for: ", searchTerm)
@@ -60,6 +76,7 @@ func search(searchTerm string, numResults int) []tagbrowser.ResultRecordTransmit
 	return preply.C
 }
 
+//Contact server request predictions
 func predictString(searchTerm string) []string {
 	statuses["Status"] = "Predicting"
 	log.Println("Predicting: ", searchTerm)
@@ -116,6 +133,15 @@ func status() {
 }
 
 var completeMatch = false
+func isLinux() bool {
+    return (runtime.GOOS == "linux")
+}
+
+
+func isDarwin() bool {
+    return (runtime.GOOS == "darwin")
+}
+
 
 func refreshTerm() {
 	if !serverActive {
@@ -150,7 +176,9 @@ func refreshTerm() {
 					dispLine++
 				}
 				putStr(1, dispLine, fmt.Sprintf("%v", elem.Score))
-				//putStr(8, dispLine, fmt.Sprintf("%v (line %v)", elem.sample, elem.line))
+                l, _:= strconv.Atoi(elem.Line)
+                LineStr, _, _ := FetchLine(elem.Filename, l)
+				putStr(8, dispLine, fmt.Sprintf("(line %v) %v", elem.Line,  LineStr))
 				dispLine++
 				itempos++
 				prevRecord = elem
@@ -181,6 +209,7 @@ func refreshTerm() {
 	}
 }
 
+//Find the first space character to the left of the cursor
 func searchLeft(aStr string, pos int) int {
 	for i := pos; i > 0; i-- {
 		if aStr[i-1] == ' ' {
@@ -192,6 +221,7 @@ func searchLeft(aStr string, pos int) int {
 	return 0
 }
 
+//Find the first space character to the right of the cursor
 func searchRight(aStr string, pos int) int {
 	for i := pos; i < len(aStr)-1; i++ {
 		if aStr[i+1] == ' ' {
@@ -202,6 +232,8 @@ func searchRight(aStr string, pos int) int {
 	}
 	return len(aStr) - 1
 }
+
+
 func extractWord(aLine string, pos int) string {
 	start := searchLeft(aLine, pos)
 	return aLine[start:pos]
@@ -227,7 +259,7 @@ func doInput() {
 				//statuses["Input"] = "Processing"
 				switch ev.Key {
 				case termbox.KeyArrowRight:
-					if linux {
+					if isLinux() || isDarwin()  {
 						termbox.Close()
 						cmd := exec.Command("bash", "-c", fmt.Sprintf("vim %v %v", results[selection].Filename, fmt.Sprintf("+%v", results[selection].Line)))
 						cmd.Stdout = os.Stdout
@@ -247,9 +279,15 @@ func doInput() {
 					}
 				case termbox.KeyArrowDown:
 					selection++
+                    if selection > len(results) {
+                        selection = len(results)
+                    }
 					focus = "selection"
 				case termbox.KeyArrowUp:
 					selection--
+                    if selection < 0 {
+                        selection = 0
+                    }
 					focus = "selection"
 				case termbox.KeyDelete:
 
@@ -294,13 +332,16 @@ func doInput() {
 	}
 }
 
+//ForeGround colour
 func foreGround() termbox.Attribute {
 	return termbox.ColorBlack
 }
+//Background colour
 func backGround() termbox.Attribute {
 	return termbox.ColorWhite
 }
 
+//Display a string at XY
 func putStr(x, y int, aStr string) {
 	width, height := termbox.Size()
 	if y >= height {
@@ -313,6 +354,8 @@ func putStr(x, y int, aStr string) {
 		termbox.SetCell(x+i, y, r, foreGround(), backGround())
 	}
 }
+
+//Redraw screen every 200 Milliseconds
 func automaticRefreshTerm() {
 	for i := 0; i < 1; i = 0 {
 		refreshTerm()
@@ -334,6 +377,8 @@ func automaticdoInput() {
 		}
 	}
 }
+
+//Clean up and exit
 func shutdown() {
 	//Shut down resources so the display thread doesn't panic when the display driver goes away first
 	//When we get a file persistence layer, it will go here
