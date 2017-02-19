@@ -42,7 +42,7 @@ func (f *Farm) Shutdown() {
 	time.Sleep(time.Second * 10.0)
 	for _, s := range f.silos {
 		s.Checkpoint()
-		log.Printf("Silo %v")
+		log.Printf("Silo %v", s.id)
 
 	}
 }
@@ -105,6 +105,7 @@ func createFarm(location string, number_of_silos int, inputchan chan RecordTrans
 	f.LogChan["warning"] = make(chan string, 100)
 	f.LogChan["transport"] = make(chan string, 100)
 	f.LogChan["thread"] = make(chan string, 100)
+	f.LogChan["debug"] = make(chan string, 100)
 	go ignoreLogWorker(f.LockLog)
 	go printLogWorker(f.LogChan["file"])
 	go printLogWorker(f.LogChan["database"])
@@ -112,6 +113,7 @@ func createFarm(location string, number_of_silos int, inputchan chan RecordTrans
 	go printLogWorker(f.LogChan["warning"])
 	go ignoreLogWorker(f.LogChan["transport"])
 	go ignoreLogWorker(f.LogChan["thread"])
+	go ignoreLogWorker(f.LogChan["debug"])
 	f.recordCh = inputchan
 	f.permanentStoreCh = permanentStoreCh
 	f.location = location
