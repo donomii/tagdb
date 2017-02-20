@@ -2,6 +2,7 @@
 package tagbrowser
 
 import (
+    "github.com/cornelk/hashmap"
 	"bytes"
 	"database/sql"
 	"database/sql/driver"
@@ -88,7 +89,8 @@ type tagSilo struct {
 	Operational          bool
 	ReadOnly             bool
 	string_cache         map[int]string
-	symbol_cache         map[string]int
+	//symbol_cache         map[string]int
+	symbol_cache         *hashmap.HashMap
 	tag_cache            map[int][]int
 	record_cache         map[int]record
 	threadsWait          sync.WaitGroup
