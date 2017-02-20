@@ -1,8 +1,10 @@
 package main
 
 import (
+    "unicode/utf8"
 	"bytes"
-"github.com/donomii/tagdb/tagbrowser"
+    "github.com/donomii/tagdb/tagbrowser"
+    "unicode"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -49,6 +51,16 @@ func dispatchURLs(urlCh chan string, matchString string) {
 var urlCh chan string
 var rpcClient *rpc.Client
 var debug = false
+
+
+func hasSymbol(str string) bool {
+    for _, letter := range str {
+        if unicode.IsSymbol(letter) {
+            return true
+        }
+    }
+    return false
+}
 
 func main() {
 	var matchString string
@@ -101,57 +113,68 @@ func handler(ctx *fetchbot.Context, res *http.Response, err error) {
 		}
 	}()
 	body, err := ioutil.ReadAll(res.Body)
-	log.Printf("[%d] %s %s\n", res.StatusCode, ctx.Cmd.Method(), ctx.Cmd.URL())
+    if !utf8.Valid(body) {
+        log.Println("Rejecting ", ctx.Cmd.URL(), " due to invalid unicode characters")
+    } else {
+        log.Printf("[%d] %s %s\n", res.StatusCode, ctx.Cmd.Method(), ctx.Cmd.URL())
 
-	//fmt.Println(string(body))
-	f := tagbrowser.RegSplit(strings.ToLower(string(body)), tagbrowser.FragsRegex)
+        //fmt.Println(string(body))
+        f := tagbrowser.RegSplit(strings.ToLower(string(body)), tagbrowser.FragsRegex)
 
-	args := &tagbrowser.InsertArgs{fmt.Sprintf("%s", ctx.Cmd.URL()), -1, f}
-	reply := &tagbrowser.SuccessReply{}
-	rpcClient, err = jsonrpc.Dial("tcp", tagbrowser.ServerAddress)
-	if err != nil {
-		log.Printf("Failed to connect to %s, exiting\n", tagbrowser.ServerAddress)
-        return
-	} else {
+        filtered := []string{}
+        for _, x := range f {
+            if !hasSymbol(x) {
+                filtered = append(filtered, x)
+            }
+        }
 
-		log.Printf("Connected to tagserver on %s\n", tagbrowser.ServerAddress)
-	}
-	rpcClient.Call("TagResponder.InsertRecord", args, reply)
+        args := &tagbrowser.InsertArgs{fmt.Sprintf("%s", ctx.Cmd.URL()), -1, filtered}
+        reply := &tagbrowser.SuccessReply{}
+        rpcClient, err = jsonrpc.Dial("tcp", tagbrowser.ServerAddress)
+        if err != nil {
+            log.Printf("Failed to connect to %s, exiting\n", tagbrowser.ServerAddress)
+            return
+        } else {
 
-	var (
-		anchorTag = []byte{'a'}
-		hrefTag   = []byte("href")
-		//httpTag   = []byte("http")
-	)
+            log.Printf("Connected to tagserver on %s\n", tagbrowser.ServerAddress)
+        }
+        rpcClient.Call("TagResponder.InsertRecord", args, reply)
 
-	bodyR := bytes.NewReader(body)
-	//defer bodyR.Close()
-	tkzer := html.NewTokenizer(bodyR)
+        var (
+            anchorTag = []byte{'a'}
+            hrefTag   = []byte("href")
+            //httpTag   = []byte("http")
+        )
 
-	for {
-		switch tkzer.Next() {
-		case html.ErrorToken:
-			// HANDLE ERROR
-			return
+        bodyR := bytes.NewReader(body)
+        //defer bodyR.Close()
+        tkzer := html.NewTokenizer(bodyR)
 
-		case html.StartTagToken:
-			tag, hasAttr := tkzer.TagName()
-			if hasAttr && bytes.Equal(anchorTag, tag) { // a
-				// HANDLE ANCHOR
-				key, val, _ := tkzer.TagAttr()
-				if bytes.Equal(hrefTag, key) { // href, http(s)
-					// HREF TAG
-					//fmt.Printf("%s, %s\n", key, val)
-					parentURL := ctx.Cmd.URL()
-					href, _ := url.Parse(fmt.Sprintf("%s", val))
-					//log.Printf("Found href: %s\n", href)
+        for {
+            switch tkzer.Next() {
+            case html.ErrorToken:
+                // HANDLE ERROR
+                return
 
-					urlCh <- fmt.Sprintf("%s", parentURL.ResolveReference(href))
-				}
+            case html.StartTagToken:
+                tag, hasAttr := tkzer.TagName()
+                if hasAttr && bytes.Equal(anchorTag, tag) { // a
+                    // HANDLE ANCHOR
+                    key, val, _ := tkzer.TagAttr()
+                    if bytes.Equal(hrefTag, key) { // href, http(s)
+                        // HREF TAG
+                        //fmt.Printf("%s, %s\n", key, val)
+                        parentURL := ctx.Cmd.URL()
+                        href, _ := url.Parse(fmt.Sprintf("%s", val))
+                        //log.Printf("Found href: %s\n", href)
 
-			}
-		}
-	}
+                        urlCh <- fmt.Sprintf("%s", parentURL.ResolveReference(href))
+                    }
+
+                }
+            }
+        }
+    }
 	log.Printf("Finished %s\n", ctx.Cmd.URL())
 
 }
