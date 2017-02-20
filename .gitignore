@@ -1,1 +1,3 @@
 *.exe
+tagbrowser/log
+tagbrowser/tagsbrowser.cpuprofile
