@@ -24,7 +24,7 @@ var defaultManor *Manor
 
 var BoundariesRegex = regexp.MustCompile("\\b|\\p{Z}+|\\p{C}|\\s+|\\/+|\\.+|\\\\+|_+")
 
-var FragsRegex = regexp.MustCompile(`(\s+|,+|;+|:+|"+|'+|\.|/+|\+|-+|_+|=+|}+|{+)`) //regexp.MustCompile("(\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+|:|,|\"|{|}|))")
+var FragsRegex = regexp.MustCompile(`(\s+|,+|;+|:+|"+|'+|\.|/+|\+|-+|_+|=+|}+|{+|>+|<+|!+|\)+|\(+)`) //regexp.MustCompile("(\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+|:|,|\"|{|}|>|<|!|))")
 
 var FragsString = "\\b|\\p{Z}+|\\p{C}|\\s+|\\/+|\\.+|\\\\+|_+|\\\\(|\\\\)"
 
