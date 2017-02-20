@@ -3,6 +3,7 @@ package main
 
 import (
 "github.com/donomii/tagdb/tagbrowser"
+    "strings"
     "runtime"
     "strconv"
     "io"
@@ -175,13 +176,15 @@ func refreshTerm() {
 					putStr(3, dispLine, fmt.Sprintf("%v", elem.Filename))
 					dispLine++
 				}
-				putStr(1, dispLine, fmt.Sprintf("%v", elem.Score))
-                l, _:= strconv.Atoi(elem.Line)
-                LineStr, _, _ := FetchLine(elem.Filename, l)
-				putStr(8, dispLine, fmt.Sprintf("(line %v) %v", elem.Line,  LineStr))
-				dispLine++
-				itempos++
-				prevRecord = elem
+                //if elem.Line != "-1" && strings.HasPrefix(elem.Filename, "http") {
+                    putStr(1, dispLine, fmt.Sprintf("%v", elem.Score))
+                    l, _:= strconv.Atoi(elem.Line)
+                    LineStr, _, _ := FetchLine(elem.Filename, l)
+                    putStr(8, dispLine, fmt.Sprintf("(line %v) %v", elem.Line,  LineStr))
+                    dispLine++
+                    itempos++
+                    prevRecord = elem
+                //}
 			}
 		}
 		putStr(1, height-3, fmt.Sprintf("%v results", len(results)))
