@@ -2,6 +2,8 @@
 package tagbrowser
 
 import (
+    "unsafe"
+    "github.com/cornelk/hashmap"
     //"runtime/pprof"
     //debugModule "runtime/debug"
 	"bytes"
@@ -20,6 +22,19 @@ import (
 
 	"github.com/tchap/go-patricia/patricia"
 )
+
+func NewHash() *hashmap.HashMap {
+    return hashmap.New()
+}
+
+func SetHash(h *hashmap.HashMap, key string, val int) {
+    h.Set(key, unsafe.Pointer(&val))
+}
+
+func GetHash(h *hashmap.HashMap, key string) (unsafe.Pointer, bool) {
+    return h.GetStringKey(key)
+}
+
 
 func (s *tagSilo) predictString(aStr string, maxResults int) []string {
 	//var searchRegex = regexp.MustCompile(fmt.Sprintf("^%v", aStr))
@@ -125,6 +140,7 @@ func (s *tagSilo) storeRecordWorker() {
             r := record{s.get_or_create_symbol(aRecord.Filename), aRecord.Line, s.makeFingerprint(aRecord.Fingerprint)}
             s.LogChan["transport"] <- fmt.Sprintln("storeRecord writing to recordCh")
             s.recordCh <- r
+            s.count("record_accepted_for_store")
             s.LogChan["transport"] <- fmt.Sprintln("storeRecord waiting for input")
         }
 	}
@@ -142,6 +158,7 @@ func (s *tagSilo) storePermanentRecordWorker() {
                 log.Println("storeRecord writing to recordCh")
             }
             s.recordCh <- r
+            s.count("record_accepted_for_store")
             if debug {
                 log.Println("storeRecord waiting for input")
             }
@@ -177,6 +194,8 @@ func (s *tagSilo) storeMemRecordWorker() {
 
 			//}
 		}
+        
+        s.count("record_inserted")
 		if debug {
 			log.Println("storeMemRecord waiting for input")
 		}
@@ -240,6 +259,7 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 	if dupe {
 		s.count("duplicates_rejected")
 		log.Printf("Attempt to insert a duplicate record.  This is not an error.")
+        s.count("record_duplicate")
 	} else {
 		s.Dirty()
 		s.count("db_update")
@@ -320,9 +340,10 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 
 		}
 
-		//log.Printf("Record inserted")
 		}
 
+		log.Printf("Record inserted")
+        s.count("record_inserted")
 		{
 
 		}
@@ -616,9 +637,12 @@ func (s *tagSilo) get_memdb_symbol(aStr string) (int, error) {
 func (s *tagSilo) get_symbol(aStr string) (int, error) {
 	var retval int
 	var err error
-	if val, ok := s.symbol_cache[aStr]; ok {
+	//if val, ok := s.symbol_cache[aStr]; ok {
+	if val, ok := GetHash(s.symbol_cache,aStr); ok {
 		s.count("symbol_cache_hit")
-		return val, nil
+        var ret1 *int
+        ret1 =(*int)(val)
+		return *ret1, nil
 	} else {
 		s.count("symbol_cache_miss")
 		if s.memory_db {
@@ -629,6 +653,7 @@ func (s *tagSilo) get_symbol(aStr string) (int, error) {
 		}
 		if retval != 0 && err == nil {
 			//s.symbol_cache[aStr] = retval
+			SetHash(s.symbol_cache,aStr, retval)
 		}
 	}
 	return retval, err
@@ -683,9 +708,12 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 	for i := 0; s == nil; i = i + 1 {
 		time.Sleep(time.Millisecond * 100)
 	}
-	if val, ok := s.symbol_cache[aStr]; ok {
+	//if val, ok := s.symbol_cache[aStr]; ok {
+	if val, ok := GetHash(s.symbol_cache, aStr); ok {
 		s.count("get/create_symbol_cache_hit")
-		return val
+        var ret1 *int
+        ret1 = (*int)(val)
+		return *ret1
 	} else {
 		s.count("get/create_symbol_cache_miss")
 		if aStr == "" {
@@ -1007,10 +1035,10 @@ func (s *tagSilo) monitorSiloWorker() {
 			s.string_cache = map[int]string{}
 			s.count("string_cache_clear")
 		}
-		if len(s.symbol_cache) > 10000 {
+		/*if len(s.symbol_cache) > 10000 {
 			s.symbol_cache = map[string]int{}
 			s.count("symbol_cache_clear")
-		}
+		}*/
 
 		if len(s.tag_cache) > 10000 {
 			s.tag_cache = map[int][]int{}
@@ -1150,7 +1178,8 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 	silo.offload_index = 2
 	silo.maxRecords = maxRecords
 	silo.string_cache = map[int]string{}
-	silo.symbol_cache = map[string]int{}
+	//silo.symbol_cache = map[string]int{}
+	silo.symbol_cache = NewHash()
 	silo.tag_cache = map[int][]int{}
 	silo.record_cache = map[int]record{}
 	silo.counters = map[string]int{}
