@@ -119,6 +119,7 @@ func handler(ctx *fetchbot.Context, res *http.Response, err error) {
         log.Printf("[%d] %s %s\n", res.StatusCode, ctx.Cmd.Method(), ctx.Cmd.URL())
 
         //fmt.Println(string(body))
+        body = []byte(RemoveTags(string(body)))
         f := tagbrowser.RegSplit(strings.ToLower(string(body)), tagbrowser.FragsRegex)
 
         filtered := []string{}
@@ -177,4 +178,11 @@ func handler(ctx *fetchbot.Context, res *http.Response, err error) {
     }
 	log.Printf("Finished %s\n", ctx.Cmd.URL())
 
+}
+
+
+func RemoveTags(body string) string {
+    r := regexp.MustCompile(`<.*?>`)
+    unTaggedBody := r.ReplaceAllString(body, "")
+    return unTaggedBody
 }
