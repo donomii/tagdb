@@ -174,26 +174,33 @@ func (s *tagSilo) storeMemRecordWorker() {
 			log.Println("StoreMemRecordWorker exiting in silo ", s.id)
 			return
 		}
-		//if debug {
-		//	log.Println("storeMemRecord got input", line_elem)
-		//}
+		if debug {
+			log.Println("storeMemRecord got input", line_elem)
+		}
 
 		s.database = append(s.database, line_elem)
 		s.last_database_record = len(s.database) - 1
 
 		for _, v := range line_elem.Fingerprint {
-			//if !contains(tag2file[v], &line_elem) {
-			if debug {
-				log.Printf("tag id: %v, tag2file len : %v, string table len : %v", v, len(s.tag2file), len(s.reverse_string_table))
-			}
-			s.tag2file[v] = append(s.tag2file[v], &s.database[len(s.database)-1])
+            //FIXME
+			//if !contains(s.tag2file[v], &line_elem) {
+                if debug {
+                    log.Printf("tag id: %v, tag2file len : %v, string table len : %v", v, len(s.tag2file), len(s.reverse_string_table))
+                }
+                s.tag2file[v] = append(s.tag2file[v], &s.database[s.last_database_record])
 
-			if debug {
-				log.Printf("Added record to tag %v (%v)", s.getString(v), v)
-			}
+                if debug {
+                    log.Printf("Added record %v to tag %v (%v)", s.last_database_record, s.getString(v), v)
+                }
 
 			//}
 		}
+        s.counterMutex.Lock()
+        s.counters["records"] = s.last_database_record
+        s.counterMutex.Unlock()
+        if debug {
+            log.Printf("Total records: %v", s.last_database_record)
+        }
         
         s.count("record_inserted")
 		if debug {
@@ -773,6 +780,7 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 					s.tag2file = append(s.tag2file, []*record{})
 
 				}
+                s.count("symbols")
 				if debug {
 					log.Printf("Finished store\n")
 				}
@@ -1045,6 +1053,8 @@ func (s *tagSilo) monitorSiloWorker() {
 			s.count("string_cache_clear")
 		}
 
+        s.counterMutex.Lock()
+        defer s.counterMutex.Unlock()
 		log.Println("Silo: ", s.filename, " : ", s.id, s.counters)
 
 	}
@@ -1062,27 +1072,6 @@ func (s *tagSilo) heartBeat() {
 		time.Sleep(1.0 * time.Second)
 	}
 }
-
-type SerialiseMe struct {
-	Id                   string
-	Last_database_record int
-
-	Database          []record //The in memory database, if any
-	Counters          map[string]int
-	Next_string_index int
-	Last_tag_record   int
-	//String_table      *patricia.Trie
-
-	Reverse_string_table []string
-	Tag2file             [][]*record
-	Tag2record           [][]int
-
-	Temporary     bool
-	Offload_index int
-	Offloading    bool
-	MaxRecords    int
-}
-
 func (s *tagSilo) Dirty() {
 	s.LockLog <- "Taking dirty lock"
 	s.checkpointMutex.Lock()
@@ -1157,6 +1146,27 @@ func (s *tagSilo) SQLCommitWorker() {
 	}
 }
 
+type SerialiseMe struct {
+	Id                   string
+	Last_database_record int
+
+	Database          []record //The in memory database, if any
+	Counters          map[string]int
+	Next_string_index int
+	Last_tag_record   int
+	//String_table      *patricia.Trie  //Does not serialise?
+
+	Reverse_string_table []string
+	Tag2file             [][]*record
+	Tag2record           [][]int
+
+	Temporary     bool
+	Offload_index int
+	Offloading    bool
+	MaxRecords    int
+}
+
+
 func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, inputChan chan RecordTransmittable, dataDir string, permanentStoreCh chan RecordTransmittable, isTemporary bool, maxRecords int, checkpointMutex sync.Mutex, logChans map[string]chan string) *tagSilo {
 
 	silo := &tagSilo{}
@@ -1223,6 +1233,7 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 				//s.temporary     = d.Temporary
 				silo.offload_index = d.Offload_index
 				//s.offloading    = d.Offloading
+                //silo.maxRecords = d.MaxRecords
 
 				silo.dec = nil
 				silo.LogChan["file"] <- fmt.Sprintln("Recreating string table")
