@@ -3,7 +3,7 @@ package main
 
 import (
 "github.com/donomii/tagdb/tagbrowser"
-    "strings"
+    //"strings"
     "runtime"
     "strconv"
     "io"
@@ -48,28 +48,37 @@ var predictResults []string
 var refreshMutex sync.Mutex
 
 
+var LineCache map[string]string
+
 func FetchLine(f string, lineNum int) (line string, lastLine int, err error) {
-    r, _ := os.Open(f)
-    sc := bufio.NewScanner(r)
-    for sc.Scan() {
-        lastLine++
-        if lastLine == lineNum {
-            return sc.Text(), lastLine, sc.Err()
+    key := fmt.Sprintf("%v%v", f, lineNum)
+    if val, ok := LineCache[key]; ok {
+        return val, -1, nil
+    } else {
+        r, _ := os.Open(f)
+        sc := bufio.NewScanner(r)
+        for sc.Scan() {
+            lastLine++
+            if lastLine == lineNum {
+                LineCache[key] = sc.Text()
+                return sc.Text(), lastLine, sc.Err()
+            }
         }
+        LineCache[key] = line
+        return line, lastLine, io.EOF
     }
-    return line, lastLine, io.EOF
 }
 
 //Contact server with search string
 func search(searchTerm string, numResults int) []tagbrowser.ResultRecordTransmittable {
 	statuses["Status"] = "Searching"
-	log.Println("Searching for: ", searchTerm)
+	//log.Println("Searching for: ", searchTerm)
 
 	args := &tagbrowser.Args{searchTerm, numResults}
 	preply := &tagbrowser.Reply{}
 	err := client.Call("TagResponder.SearchString", args, preply)
 	if err != nil {
-		log.Println("RPC error:", err)
+		//log.Fatal("RPC error:", err)
 		statuses["Status"] = fmt.Sprintf("RPC error:", err)
 	} else {
 		statuses["Status"] = "Search complete"
@@ -80,13 +89,13 @@ func search(searchTerm string, numResults int) []tagbrowser.ResultRecordTransmit
 //Contact server request predictions
 func predictString(searchTerm string) []string {
 	statuses["Status"] = "Predicting"
-	log.Println("Predicting: ", searchTerm)
+	//log.Println("Predicting: ", searchTerm)
 
 	args := &tagbrowser.Args{searchTerm, 10}
 	preply := &tagbrowser.StringListReply{}
 	err := client.Call("TagResponder.PredictString", args, preply)
 	if err != nil {
-		log.Println("RPC error:", err)
+		//log.Println("RPC error:", err)
 		statuses["Status"] = fmt.Sprintf("RPC error:", err)
 	} else {
 		statuses["Status"] = "Predict complete"
@@ -103,9 +112,9 @@ func status() {
 	}
 	args := &tagbrowser.Args{"", 0}
 	sreply := &tagbrowser.StatusReply{}
-	log.Println("Fetching status")
+	//log.Println("Fetching status")
 	err = client.Call("TagResponder.Status", args, sreply)
-	log.Println("Received status")
+	//log.Println("Received status")
 	if err != nil {
 		log.Fatal("RPC error:", err)
 	}
@@ -392,6 +401,7 @@ func shutdown() {
 
 }
 func main() {
+    LineCache = map[string]string{}
 	flag.StringVar(&tagbrowser.ServerAddress, "server", tagbrowser.ServerAddress, fmt.Sprintf("Server IP and Port.  Default: %s", tagbrowser.ServerAddress))
 	flag.Parse()
 	//terms := flag.Args()
