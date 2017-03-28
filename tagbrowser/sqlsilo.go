@@ -13,8 +13,8 @@ import (
 
 )
 
-func NewSQLStore(filename string) *SiloStore {
-    s := SiloStore{}
+func NewSQLStore(filename string) *SqlStore {
+    s := SqlStore{}
     db, err := sql.Open("sqlite3", filename)
     if err != nil {
         log.Fatal(err)
@@ -23,7 +23,12 @@ func NewSQLStore(filename string) *SiloStore {
     return &s
 }
 
-func (s *SiloStore) Init(silo *tagSilo) {
+//FIXME this needs to go, all access must be through member functions!
+func (s *SqlStore) Dbh () *sql.DB {
+    return s.Db
+}
+
+func (s *SqlStore) Init(silo *tagSilo) {
         if debug {
             log.Println("Initialising silo ", silo.id)
         }
@@ -119,7 +124,7 @@ func (s *SiloStore) Init(silo *tagSilo) {
         }
 }
 
-func (store *SiloStore) GetString(s *tagSilo, index int) string {
+func (store *SqlStore) GetString(s *tagSilo, index int) string {
     var val string
     s.count("string_cache_miss")
     s.count("sql_select")
@@ -135,7 +140,7 @@ func (store *SiloStore) GetString(s *tagSilo, index int) string {
     return val
 }
 
-func (s *SiloStore) GetSymbol(silo *tagSilo, aStr string) int {
+func (s *SqlStore) GetSymbol(silo *tagSilo, aStr string) int {
     silo.count("sql_select")
     var res int
     err := s.Db.QueryRow("select value from SymbolTable where id like ?", []byte(aStr)).Scan(&res)
@@ -158,7 +163,7 @@ func (s *SiloStore) GetSymbol(silo *tagSilo, aStr string) int {
 }
 
 
-func (s *SiloStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) {
+func (s *SqlStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) {
     val, _ := json.Marshal(aRecord)
     stmt, err := s.Db.Prepare("insert into RecordTable(id, value) values(?, ?)")
     if err != nil {
@@ -197,7 +202,7 @@ func (s *SiloStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) {
 }
 
 
-func (s *SiloStore) InsertStringAndSymbol(silo *tagSilo, aStr string) {
+func (s *SqlStore) InsertStringAndSymbol(silo *tagSilo, aStr string) {
     silo.count("sql_insert")
 
     stmt, err := s.Db.Prepare("insert into StringTable(id, value) values(?, ?)")
@@ -231,7 +236,7 @@ func (s *SiloStore) InsertStringAndSymbol(silo *tagSilo, aStr string) {
     }
 }
 
-func (s *SiloStore) Flush(silo *tagSilo) {
+func (s *SqlStore) Flush(silo *tagSilo) {
     sqlStmt := `PRAGMA wal_checkpoint(TRUNCATE)`
     _, err := s.Db.Exec(sqlStmt)
 		if err != nil {
@@ -239,7 +244,7 @@ func (s *SiloStore) Flush(silo *tagSilo) {
 		}
 }
 
-func (s *SiloStore) GetRecordId(tagID int) []int {
+func (s *SqlStore) GetRecordId(tagID int) []int {
     var retarr []int
     //log.Printf("Fetching %v", tagID)
     rows, err := s.Db.Query("select recordid from TagToRecord where tagid like ?", tagID)
