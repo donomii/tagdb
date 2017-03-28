@@ -61,7 +61,6 @@ type tagSilo struct {
 	id                   string
 	last_database_record int
 	filename             string
-	dbHandle             *sql.DB
 	transactionHandle    driver.Tx
 	recordCh             chan record
 	permanentStoreCh     chan RecordTransmittable
@@ -97,7 +96,7 @@ type tagSilo struct {
 	dirty                bool
 	LockLog              chan string
 	LogChan              map[string]chan string
-    Store                *SiloStore
+    Store                SiloStore
 }
 
 type tomlConfig struct {
@@ -158,6 +157,18 @@ type ResultRecordTransmittable struct {
 type resultRecordCollection []resultRecord
 type ResultRecordTransmittableCollection []ResultRecordTransmittable
 
-type SiloStore struct {
+type SiloStore interface {
+    Init(silo *tagSilo)
+    GetString(s *tagSilo, index int) string
+    GetSymbol(silo *tagSilo, aStr string) int
+    InsertRecord(silo *tagSilo, key []byte, aRecord record)
+    InsertStringAndSymbol(silo *tagSilo, aStr string)
+    Flush(silo *tagSilo)
+    GetRecordId(tagID int) []int
+    Dbh () *sql.DB
+}
+
+
+type SqlStore struct {
     Db *sql.DB
 }
