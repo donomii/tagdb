@@ -1,3 +1,16 @@
 *.exe
 tagbrowser/log
 tagbrowser/tagsbrowser.cpuprofile
+*.checkpoint
+
+*.tagdb
+
+fetchbot
+
+loader
+
+query
+
+tagserver
+
+tagshell
