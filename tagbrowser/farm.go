@@ -6,6 +6,7 @@
 package tagbrowser
 
 import (
+    "os"
 	"fmt"
 	"log"
 	"sort"
@@ -117,6 +118,7 @@ func createFarm(location string, number_of_silos int, inputchan chan RecordTrans
 	f.recordCh = inputchan
 	f.permanentStoreCh = permanentStoreCh
 	f.location = location
+    os.MkdirAll(f.location, 0777)
 	f.silos = []*tagSilo{}
 	f.memory_only = memory_only
 	f.maxSilos = number_of_silos
@@ -165,6 +167,9 @@ func (f *Farm) scanFileDatabase(searchString string, maxResults int, exactMatch 
 		}
 		pending = pending + 1
 		go func() {
+			if debug {
+				log.Printf("Starting search\n")
+			}
 			aFing := aSilo.makeFingerprintFromSearch(fmt.Sprintf("%v", searchString))
 			if debug {
 				log.Printf("Searching with fingerprint: %V", aFing)
