@@ -40,7 +40,7 @@ func (s *tagSilo) predictString(aStr string, maxResults int) []string {
 	var searchResults = []string{}
 	matchedWords := func(prefix patricia.Prefix, item patricia.Item) error {
 		if len(searchResults) < maxResults+1 {
-			log.Println("Found match for ", aStr, " : ", s.getString(item.(int)))
+			s.LogChan["file"] <- fmt.Sprintf("Found match for %v : %v\n", aStr, s.getString(item.(int)))
 			searchResults = append(searchResults, s.getString(item.(int)))
 			return nil
 		} else {
@@ -150,7 +150,7 @@ func (s *tagSilo) storePermanentRecordWorker() {
 		if s.ReadOnly || !s.Operational {
 			s.permanentStoreCh <- aRecord //Push the current record back onto the queue
 			//FIXME race condition against shutdown (monitorworker)
-			log.Println("StorePermanentRecordWorker exiting in silo ", s.id)
+			s.LogChan["file"] <- fmt.Sprintf("StorePermanentRecordWorker exiting in silo %v", s.id)
 		} else {
             r := record{s.get_or_create_symbol(aRecord.Filename), aRecord.Line, s.makeFingerprint(aRecord.Fingerprint)}
             if debug {
@@ -291,8 +291,8 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 
 			if jerr == nil {
 
-				stmt, err := s.dbHandle.Prepare("insert or replace into TagToRecordTable(id, value) values(?, ?)")
-				stmt1, err1 := s.dbHandle.Prepare("update TagToRecordTable SET value = ? where id like ? ")
+				stmt, err := s.Store.Dbh().Prepare("insert or replace into TagToRecordTable(id, value) values(?, ?)")
+				stmt1, err1 := s.Store.Dbh().Prepare("update TagToRecordTable SET value = ? where id like ? ")
 				if err != nil {
 					s.LogChan["error"] <- fmt.Sprintln("While preparing to insert TagToRecordTable: ", err)
 				}
@@ -327,7 +327,7 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
         s.Store.InsertRecord(s, key, aRecord)
 
 				{
-		stmt, err := s.dbHandle.Prepare("insert or ignore into TagToRecord(tagid, recordid) values(?, ?)")
+		stmt, err := s.Store.Dbh().Prepare("insert or ignore into TagToRecord(tagid, recordid) values(?, ?)")
 		defer stmt.Close()
 		for _, v := range aRecord.Fingerprint {
 			_, err = stmt.Exec(v, s.last_database_record)
@@ -348,7 +348,6 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 
 		}
 
-		log.Printf("Record inserted")
         s.count("record_inserted")
 		{
 
@@ -418,12 +417,12 @@ func (s *tagSilo) getDiskRecord(recordID int) record {
 		if s == nil {
 			panic("Silo is nil")
 		}
-		if s.dbHandle == nil {
+		if s.Store == nil {
 			panic("nil dbhandle!")
 		}
 		s.count("sql_select")
 
-		err = s.dbHandle.QueryRow("select value from RecordTable where id like ?", key).Scan(&val)
+		err = s.Store.Dbh().QueryRow("select value from RecordTable where id like ?", key).Scan(&val)
 		if err != nil {
 			s.LogChan["error"] <- fmt.Sprintln("While trying to read ", recordID, " from RecordTable: ", err)
 			return retval
@@ -606,9 +605,9 @@ func (s *tagSilo) get_memdb_symbol(aStr string) (int, error) {
 	if s == nil {
 		panic("Silo is nil")
 	}
-	if s.dbHandle != nil {
-		panic("dbhandle not nil for memdb!")
-	}
+	//if s.dbHandle != nil {
+		//panic("dbhandle not nil for memdb!")
+	//}
 
 	key := patricia.Prefix(aStr)
 	if key == nil {
@@ -674,7 +673,7 @@ func (s *tagSilo) get_diskdb_symbol(aStr string) (int, error) {
 	if s == nil {
 		panic("Silo is nil")
 	}
-	if s.dbHandle == nil {
+	if s.Store == nil {
 		panic("nil dbhandle!")
 	}
 	if s.memory_db {
@@ -1053,8 +1052,8 @@ func (s *tagSilo) monitorSiloWorker() {
 		}
 
         s.counterMutex.Lock()
-        defer s.counterMutex.Unlock()
 		log.Println("Silo: ", s.filename, " : ", s.id, s.counters)
+        s.counterMutex.Unlock()
 
 	}
 }
@@ -1078,6 +1077,8 @@ func (s *tagSilo) Dirty() {
 	s.dirty = true
 	s.LockLog <- "Released dirty lock"
 }
+
+
 func (s *tagSilo) Checkpoint() {
 	s.LockLog <- "Locking checkpoint"
 	s.checkpointMutex.Lock()
@@ -1086,6 +1087,7 @@ func (s *tagSilo) Checkpoint() {
 	s.LockMe()
 	defer s.UnlockMe()
 	s.LogChan["file"] <- fmt.Sprintf("Checkpointing silo %v", s.id)
+
 	d := SerialiseMe{s.id, s.last_database_record, s.database, s.counters, s.next_string_index, s.last_tag_record, s.reverse_string_table, s.tag2file, s.tag2record, s.temporary, s.offload_index, s.offloading, s.maxRecords}
 
 	f, _ := os.Create(fmt.Sprintf("%v.checkpoint", s.filename))
@@ -1093,7 +1095,7 @@ func (s *tagSilo) Checkpoint() {
 	enc := gob.NewEncoder(f)
 	encErr := enc.Encode(d)
 	if encErr != nil {
-		log.Println("Failed to checkpoint silo: ", encErr)
+		log.Println("Failed to checkpoint silo: ", encErr, " silo ", s.id)
 	}
 	f.Sync()
 	f.Close()
@@ -1103,10 +1105,10 @@ func (s *tagSilo) Checkpoint() {
 
 func (s *tagSilo) checkpointWorker() {
 	for {
-		time.Sleep(time.Second * 60.0)
+		time.Sleep(time.Second * 90.0)
 		if s.dirty && s.Operational {
 			s.Checkpoint()
-			log.Println("Checkpoint complete ", s.filename)
+            s.LogChan["file"] <- fmt.Sprintf("Checkpoint complete for silo %v", s.id)
 		}
 		if !s.Operational {
 			return
@@ -1247,7 +1249,7 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 		}
 	} else {
 
-		log.Printf("Opening silo %v", silo.filename)
+		silo.LogChan["file"] <- fmt.Sprintf("Opening silo %v", silo.filename)
 
 		silo.Store = NewSQLStore(silo.filename)
         silo.Store.Init(silo)
@@ -1260,9 +1262,7 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
         }()
         */
 
-		silo.dbHandle = silo.Store.Db
-
-		log.Printf("Opened file %v", silo.filename)
+		silo.LogChan["file"] <- fmt.Sprintf("Opened file %v", silo.filename)
 
 	}
 	silo.threadsWait.Add(1)
@@ -1290,9 +1290,10 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 	go silo.monitorSiloWorker()
 
 	silo.LogChan["file"] <- fmt.Sprintln("Silo operational, ", len(silo.reverse_string_table), " entries,  ", silo.next_string_index, " strings, ", silo.last_tag_record, " tags")
-	log.Println("Silo operational, ", len(silo.reverse_string_table), " entries,  ", silo.next_string_index, " strings, ", silo.last_tag_record, " tags")
-    log.Println("Silo operational status: ", silo.Operational)
-    log.Println("Create silo finished")
+    if debug {
+        log.Println("Silo operational status: ", silo.Operational)
+        log.Println("Create silo finished")
+    }
 
 	return silo
 }
