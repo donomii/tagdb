@@ -30,7 +30,7 @@ then run a search with
 
 and you will see
 
-    jprice@ml905619 ~/D/G/s/g/d/tagdb> ./query quick brown fox
+    ./query quick brown fox
     2017/04/06 18:47:01 Searching for [quick brown fox]
     3: otherfiles/testsearch.txt(1)
     3: README.md(29)
