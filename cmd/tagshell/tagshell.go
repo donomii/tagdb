@@ -198,8 +198,8 @@ func refreshTerm() {
 		}
 		putStr(1, height-3, fmt.Sprintf("%v results", len(results)))
 		putStr(20, height-3, fmt.Sprintf("%v", statuses))
-		putStr(1, height-2, fmt.Sprintf("Type your search terms, add a - to the end to remove that term (term-)"))
-		putStr(1, height-1, fmt.Sprintf("Up/Down Arrows to select a result, Right Arrow to edit that file, Delete Quits"))
+		putStr(1, height-2, fmt.Sprintf("Type your search terms, add a - to the end of word to remove that word (word-)"))
+		putStr(1, height-1, fmt.Sprintf("Up/Down Arrows to select a result, Right Arrow to edit that file, Escape Quits"))
 		if focus == "input" {
 			putStr(8, 9, "                    ")
 			for i, v := range predictResults {
@@ -268,7 +268,8 @@ func doInput() {
 					inputPos = searchLeft(searchStr, inputPos)
 				}
 			} else {
-				//statuses["Input"] = "Processing"
+				//statuses["Input"] = fmt.Sprintf("%v", ev.Key) //"Processing"
+				//debugStr = fmt.Sprintf("key: %v, %v, %v", ev.Key, ev.Ch, ev)
 				switch ev.Key {
 				case termbox.KeyArrowRight:
 					if isLinux() || isDarwin()  {
@@ -277,9 +278,10 @@ func doInput() {
 						cmd.Stdout = os.Stdout
 						cmd.Stdin = os.Stdin
 						cmd.Stderr = os.Stderr
-						err := cmd.Run()
+						cmd.Run()
+						//err := cmd.Run()
 						//debugStr = fmt.Sprintf("%v(%v)\n", string(val), err)
-						debugStr = fmt.Sprintf("%v(%v)\n", err)
+						//debugStr = fmt.Sprintf("%v(%v)\n", err)
 						//debugStr = fmt.Sprintf("%v %v %v", "vim", results[selection].filename, fmt.Sprintf("+%v", results[selection].line))
 						//debugStr = fmt.Sprintf("%v\n", cmd.Run())
 						termbox.Init()
@@ -301,8 +303,7 @@ func doInput() {
                         selection = 0
                     }
 					focus = "selection"
-				case termbox.KeyDelete:
-
+				case termbox.KeyEsc:
 					shutdown()
 				case termbox.KeyBackspace, termbox.KeyBackspace2:
 					if len(searchStr) > 0 {
@@ -319,9 +320,6 @@ func doInput() {
 					//sort.Sort(results) FIXME
 					focus = "selection"
 					refreshTerm()
-				case termbox.KeyEsc:
-					shutdown()
-
 				case termbox.KeySpace:
 					searchStr = fmt.Sprintf("%s ", searchStr)
 					inputPos += 1
@@ -416,7 +414,8 @@ func main() {
 	statuses = map[string]string{}
 
 	termbox.Init()
-	termbox.SetInputMode(termbox.InputAlt)
+	termbox.SetInputMode(termbox.InputEsc)
+	//termbox.SetInputMode(termbox.InputAlt)
 	defer termbox.Close()
 	use_gui = true
 	serverActive = true
