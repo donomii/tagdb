@@ -82,7 +82,7 @@ tagquery searches the database, and can also command the database to shutdown
 
 #### -completeMatch
 
-    By default, if a record matches some of the tags you provided, it will be returned (with a lower score than if you matched all the tags).  If you get too many records returned, and they aren't relevent, you can request -completeMatch.  -completeMatch will only return records where all your search terms match all the tags for the record.
+By default, if a record matches some of the tags you provided, it will be returned (with a lower score than if you matched all the tags).  If you get too many records returned, and they aren't relevent, you can request -completeMatch.  -completeMatch will only return records where all your search terms match all the tags for the record.
 
 #### -shutdown
 
