@@ -60,7 +60,7 @@ tagloader recursively scans files and directories, indexing their contents
 
 -noContents is handy for indexing things like mp3 collections.
 
-Tagloader creates a record in the database, consisting of the tags generated, and the path to the file (based on the command line argument).  So if you give it a relative path, it will store relative paths, which will make it difficult to find the file again if you search for it whil ein another directory.
+Tagloader creates a record in the database, consisting of the tags generated, and the path to the file (based on the command line argument).  So if you give it a relative path, it will store relative paths, which will make it difficult to find the file again if you search for it while in another directory.
 
 Relative paths are useful for things like indexing a webserver directory, so you can later build a full URL from the relative path and the server name.  Full paths are more useful if you plan to access the files from the same machine you loaded them from.
 
