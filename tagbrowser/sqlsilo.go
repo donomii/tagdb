@@ -201,6 +201,23 @@ func (s *SqlStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) {
     }
 }
 
+func (s *SqlStore) GetRecord(key []byte) record {
+        var val []byte
+        retval := record{}
+        err := s.Dbh().QueryRow("select value from RecordTable where id like ?", key).Scan(&val)
+
+        if val != nil {
+            err = json.Unmarshal(val, &retval)
+            if err != nil { 
+                panic("Could not retrieve record")
+            }
+        }
+        if debug {
+            log.Printf("Fetched from database: %v\n", retval)
+        }
+        return retval
+}
+
 
 func (s *SqlStore) InsertStringAndSymbol(silo *tagSilo, aStr string) {
     silo.count("sql_insert")
@@ -268,3 +285,28 @@ func (s *SqlStore) GetRecordId(tagID int) []int {
     return retarr
 }
 
+
+func (s *SqlStore) StoreRecordId(key []byte, val []byte)  {
+    stmt, err := s.Dbh().Prepare("insert or replace into TagToRecordTable(id, value) values(?, ?)")
+    if err != nil {
+        panic(fmt.Sprintln("While preparing to insert TagToRecordTable: ", err))
+    }
+
+    stmt1, err1 := s.Dbh().Prepare("update TagToRecordTable SET value = ? where id like ? ")
+    if err1 != nil {
+        panic(fmt.Sprintln("While preparing to update TagToRecordTable: ", err1))
+    }
+    defer stmt.Close()
+    defer stmt1.Close()
+    _, err = stmt.Exec(key, val)
+    if err != nil {
+        panic(fmt.Sprintln("While trying to insert TagToRecordTable: ", err))
+    }
+    _, err1 = stmt1.Exec(val, key)
+    if err1 != nil {
+        panic(fmt.Sprintf("Could not store record for key(%v) in TagToRecordTable: %v\n", key, err1))
+        return
+    }
+
+       //log(fmt.Sprintln("Added record to tag %v (%v)", s.getString(v), v))
+}

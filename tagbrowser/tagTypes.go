@@ -165,7 +165,9 @@ type SiloStore interface {
     InsertStringAndSymbol(silo *tagSilo, aStr string)
     Flush(silo *tagSilo)
     GetRecordId(tagID int) []int
+    StoreRecordId(key, val []byte)
     Dbh () *sql.DB
+    GetRecord(key []byte) record
 }
 
 

@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	//_ "github.com/mattn/go-sqlite3"
 
 	"github.com/tchap/go-patricia/patricia"
 )
@@ -290,74 +290,46 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 			val, jerr := json.Marshal(recordIDs)
 
 			if jerr == nil {
+                s.Store.StoreRecordId(key, val)
 
-				stmt, err := s.Store.Dbh().Prepare("insert or replace into TagToRecordTable(id, value) values(?, ?)")
-				stmt1, err1 := s.Store.Dbh().Prepare("update TagToRecordTable SET value = ? where id like ? ")
-				if err != nil {
-					s.LogChan["error"] <- fmt.Sprintln("While preparing to insert TagToRecordTable: ", err)
-				}
-				if err1 != nil {
-					s.LogChan["error"] <- fmt.Sprintln("While preparing to update TagToRecordTable: ", err1)
-				}
-				defer stmt.Close()
-				defer stmt1.Close()
-				_, err = stmt.Exec(key, val)
-				if err != nil {
-					s.LogChan["warning"] <- fmt.Sprintln("While trying to insert TagToRecordTable: ", err)
-				}
-				_, err1 = stmt1.Exec(val, key)
-				if err1 != nil {
-					s.LogChan["error"] <- fmt.Sprintf("Could not store record for key(%v) in TagToRecordTable: %v\n", key, err1)
-					return
-				}
+                s.count("sql_insert")
+                s.tag_cache[v] = recordIDs
+            } else {
+                s.LogChan["warning"] <- fmt.Sprintln("Failed to marshall json: %v", jerr)
+            }
 
-				s.count("sql_insert")
-				s.tag_cache[v] = recordIDs
-			} else {
-				s.LogChan["warning"] <- fmt.Sprintln("Failed to marshall json: %v", jerr)
-			}
-
-			if debug {
-				s.LogChan["warning"] <- fmt.Sprintln("Added record to tag %v (%v)", s.getString(v), v)
-			}
+            if debug {
+                s.LogChan["warning"] <- fmt.Sprintln("Added record to tag %v (%v)", s.getString(v), v)
+            }
 
 			//}
 		}
 
         s.Store.InsertRecord(s, key, aRecord)
 
-				{
-		stmt, err := s.Store.Dbh().Prepare("insert or ignore into TagToRecord(tagid, recordid) values(?, ?)")
-		defer stmt.Close()
-		for _, v := range aRecord.Fingerprint {
-			_, err = stmt.Exec(v, s.last_database_record)
-			//fmt.Printf("insert into TagToRecord(tagid, recordid) values(%v, %v)\n", v, s.last_database_record)
-			s.count("sql_insert")
-			if err != nil {
-					s.LogChan["warning"] <- fmt.Sprintln("While trying to insert TagToRecord: ", err)
-				}
-				recordIDs := s.tagToRecordIDs(v)
-			recordIDs = append(recordIDs, s.last_database_record)
-
-
-
-				s.tag_cache[v] = recordIDs
-
-
-		}
+        {
+            stmt, err := s.Store.Dbh().Prepare("insert or ignore into TagToRecord(tagid, recordid) values(?, ?)")
+            defer stmt.Close()
+            for _, v := range aRecord.Fingerprint {
+                _, err = stmt.Exec(v, s.last_database_record)
+                //fmt.Printf("insert into TagToRecord(tagid, recordid) values(%v, %v)\n", v, s.last_database_record)
+                s.count("sql_insert")
+                if err != nil {
+                        s.LogChan["warning"] <- fmt.Sprintln("While trying to insert TagToRecord: ", err)
+                    }
+                recordIDs := s.tagToRecordIDs(v)
+                recordIDs = append(recordIDs, s.last_database_record)
+                    s.tag_cache[v] = recordIDs
+            }
 
 		}
 
         s.count("record_inserted")
-		{
-
-		}
-
-		return
 
 		if debug {
 			log.Println("storeFileRecord waiting for input")
 		}
+		return
 	}
 }
 
@@ -409,11 +381,8 @@ func (s *tagSilo) getDiskRecord(recordID int) record {
 	} else {
 		s.count("record_cache_miss")
 
-		var val []byte
-		retval := record{}
 		var key []byte
 		key = []byte(fmt.Sprintf("%v", recordID))
-		var err error
 		if s == nil {
 			panic("Silo is nil")
 		}
@@ -422,28 +391,7 @@ func (s *tagSilo) getDiskRecord(recordID int) record {
 		}
 		s.count("sql_select")
 
-		err = s.Store.Dbh().QueryRow("select value from RecordTable where id like ?", key).Scan(&val)
-		if err != nil {
-			s.LogChan["error"] <- fmt.Sprintln("While trying to read ", recordID, " from RecordTable: ", err)
-			return retval
-		}
-
-		if val != nil {
-
-			err = json.Unmarshal(val, &retval)
-			if err != nil {
-				//time.Sleep(1.0 * time.Second)
-
-				s.LogChan["warning"] <- fmt.Sprintf("Failed to decode record(%v) because %v, data is: %V", key, err, retval)
-
-				retval = s.getRecord(recordID)
-				s.record_cache[recordID] = retval
-			}
-		}
-		if debug {
-			log.Printf("Fetched from database: %v\n", retval)
-		}
-		return retval
+        return s.Store.GetRecord(key)
 	}
 }
 func (s *tagSilo) scanFileDatabase(aFing searchPrint, maxResults int, exactMatch bool) resultRecordCollection {
