@@ -1,7 +1,7 @@
 // manor.go
 
 //A manor holds several farms. The manor accepts records to be stored on one of the farms,
-//and it searches all the farms for a query, then combines the results and returns them
+//also it searches all the farms during a query, then combines the results and returns them
 
 package tagbrowser
 
@@ -81,7 +81,7 @@ func (m *Manor) scanFileDatabase(searchString string, maxResults int, exactMatch
 	}
 	resLock.Unlock()
 	for i := 0; pending > 0; i = i + 1 {
-		time.Sleep(10.0 * time.Millisecond)
+		time.Sleep(1.0 * time.Millisecond)
 	}
 
 	return results
