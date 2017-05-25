@@ -8,7 +8,6 @@ import (
     //debugModule "runtime/debug"
 	"bytes"
 	"encoding/gob"
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -251,15 +250,17 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 
 
 	//FIXME dupe checks are slowing inserts too much?
-	res := s.scanFileDatabase(searchPrint{aRecord.Fingerprint, fingerPrint{}}, 2, true)
 	dupe := false
-	if len(res) > 0 {
+	/*
+	res := s.scanFileDatabase(searchPrint{aRecord.Fingerprint, fingerPrint{}}, 2, true)
+    if len(res) > 0 {
 		for _, v := range res {
 			if v.filename == s.getString(aRecord.Filename) && v.line == aRecord.Line {
 				dupe = true
 			}
 		}
 	}
+    */
 
 
 	if dupe {
@@ -277,53 +278,8 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 		defer s.UnlockMe()
 		//s.LogChan["transport"] <-fmt.Sprintln("Storing record with ", len(aRecord.Fingerprint), " tags")
 
-		
-
-		for _, v := range aRecord.Fingerprint {
-			//if !contains(tag2file[v], &line_elem) {
-
-			recordIDs := s.tagToRecordIDs(v)
-			recordIDs = append(recordIDs, s.last_database_record)
-
-			key := []byte(fmt.Sprintf("%v", v))
-
-			val, jerr := json.Marshal(recordIDs)
-
-			if jerr == nil {
-                s.Store.StoreRecordId(key, val)
-
-                s.count("sql_insert")
-                s.tag_cache[v] = recordIDs
-            } else {
-                s.LogChan["warning"] <- fmt.Sprintln("Failed to marshall json: %v", jerr)
-            }
-
-            if debug {
-                s.LogChan["warning"] <- fmt.Sprintln("Added record to tag %v (%v)", s.getString(v), v)
-            }
-
-			//}
-		}
-
         s.Store.InsertRecord(s, key, aRecord)
-
-        {
-            stmt, err := s.Store.Dbh().Prepare("insert or ignore into TagToRecord(tagid, recordid) values(?, ?)")
-            defer stmt.Close()
-            for _, v := range aRecord.Fingerprint {
-                _, err = stmt.Exec(v, s.last_database_record)
-                //fmt.Printf("insert into TagToRecord(tagid, recordid) values(%v, %v)\n", v, s.last_database_record)
-                s.count("sql_insert")
-                if err != nil {
-                        s.LogChan["warning"] <- fmt.Sprintln("While trying to insert TagToRecord: ", err)
-                    }
-                recordIDs := s.tagToRecordIDs(v)
-                recordIDs = append(recordIDs, s.last_database_record)
-                    s.tag_cache[v] = recordIDs
-            }
-
-		}
-
+        s.Store.StoreTagToRecord(s.last_database_record, aRecord.Fingerprint)
         s.count("record_inserted")
 
 		if debug {
@@ -1076,7 +1032,7 @@ func (s *tagSilo) SQLCommitWorker() {
 		if err != nil {
 			log.Fatal("Could not start transaction!")
 		}
-		time.Sleep(time.Second * 15.0)
+		time.Sleep(time.Second * 600.0)  //FIXME add to config file
 
 		//s.transactionHandle.Commit()
 		s.transactionHandle = nil
