@@ -146,6 +146,25 @@ func makeArgs(aPath string, number int, f []string) *tagbrowser.InsertArgs {
 	args := &tagbrowser.InsertArgs{fmt.Sprintf("%s", url), number, f}
 	return args
 }
+
+func actuallyProcessFile(fullPath string) {
+    p := fullPath
+    var i int
+    for i = 0; i < 30; i++ {
+        p = tagbrowser.FragsRegex.ReplaceAllString(p, " ")
+
+    }
+    nf := strings.Fields(strings.ToLower(p))
+    if debug {
+        log.Printf("Inserting %v", strings.Join(nf, ","))
+    }
+
+    insertRec(fullPath, -1, nf)
+
+    processFile(fullPath, nf)
+}
+
+
 func processPaths(aCh chan []string) {
 	if debug {
 		log.Println("Worker starting: processPaths")
@@ -156,49 +175,7 @@ func processPaths(aCh chan []string) {
 		if verbose {
 			log.Println("Processing path ", fullPath)
 		}
-		p := fullPath
-		var i int
-		for i = 0; i < 30; i++ {
-			p = tagbrowser.FragsRegex.ReplaceAllString(p, " ")
-
-		}
-		//nf := tagbrowser.RegSplit(strings.ToLower(fullPath), tagbrowser.FragsRegex)
-		nf := strings.Fields(strings.ToLower(p))
-		if debug {
-			log.Printf("Inserting %v", strings.Join(nf, ","))
-		}
-
-		insertRec(fullPath, -1, nf)
-
-		processFile(fullPath, nf)
-		//pathFrags := regexp.MustCompile("/|\\\\").Split(elem, 99999) //fixme pass this from dirwalk
-		//fname := pathFrags[len(pathFrags)-1]
-
-		//return
-		//recordCh <- record{get_or_create_symbol(fullPath), -1, nf}
-		//contentRecords, _ := processFile(fullPath)
-
-		////Combine the filename's fingerprint with the line's fingerprint, so the user can remove all lines belonging to a file
-		////with the keyword- command
-		//for i, _ := range contentRecords {
-		//	//fmt.Println("before --")
-		//	//dumpFingerprint(line_elem.fingerprint)
-		//	//fmt.Println("adding --")
-		//	//dumpFingerprint(nf)
-		//	for _, value := range nf {
-		//		contentRecords[i].fingerprint = append(contentRecords[i].fingerprint, value)
-		//	}
-		//	//fmt.Println("after")
-		//	//dumpFingerprint(contentRecords[i].fingerprint)
-		//	tags := []string{}
-		//	for _, value := range contentRecords[i].fingerprint {
-		//		tags = append(tags, getString(value))
-		//	}
-		//	args := &InsertArgs{getString(contentRecords[i].filename), contentRecords[i].line, tags}
-		//	reply := &SuccessReply{}
-		//	InsertRecord(args, reply)
-		//	//recordCh <- contentRecords[i]
-		//}
+        actuallyProcessFile(fullPath)
 		wg.Done()
 	}
 }
@@ -256,9 +233,9 @@ func main() {
 	}
 	if debug {
 		log.Println("Printing extra debugging information")
-	}
-	if verbose {
-		log.Println("Printing files as they are loaded")
+        if verbose {
+            log.Println("Printing files as they are loaded")
+        }
 	}
 	if noContents {
 		log.Println("Ignoring file contents, only loading file names")
@@ -298,8 +275,12 @@ func main() {
 			if debug {
 				fmt.Printf("Scanning %v", searchDir)
 			}
-			wg.Add(1)
-			go scanDir(searchDir, pathsCh)
+            if info, err := os.Stat(searchDir); err == nil && info.IsDir() {
+                wg.Add(1)
+                go scanDir(searchDir, pathsCh)
+            } else {
+                actuallyProcessFile(searchDir)
+            }
 		}
 		wg.Wait()
 		//for true {
