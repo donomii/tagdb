@@ -168,6 +168,7 @@ type SiloStore interface {
     StoreRecordId(key, val []byte)
     Dbh () *sql.DB
     GetRecord(key []byte) record
+    StoreTagToRecord(recordId int, fp fingerPrint)
 }
 
 
