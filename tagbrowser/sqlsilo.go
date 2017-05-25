@@ -33,7 +33,7 @@ func (s *SqlStore) Init(silo *tagSilo) {
             log.Println("Initialising silo ", silo.id)
         }
 		sqlStmt := `PRAGMA synchronous = OFF;
-		PRAGMA journal_mode = MEMORY;
+		PRAGMA journal_mode = WAL;
 		`
 		var err error
 		_, err = s.Db.Exec(sqlStmt)
@@ -170,21 +170,9 @@ func (s *SqlStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) {
         silo.LogChan["error"] <- fmt.Sprintln("While preparing to insert RecordTable: ", err)
         return
     }
-    /*
-        stmt1, err1 := s.Db.Prepare("update RecordTable SET value = ? where id like ? ")
-        if err1 != nil {
-            s.LogChan["error"] <- fmt.Sprintln("While preparing to update RecordTable: ", err1)
-        }
-        _, err1 = stmt1.Exec(val, key)
-        if err1 != nil {
-            s.LogChan["error"] <- fmt.Sprintln("While trying to insert RecordTable: ", err1)
-        }
-        defer stmt1.Close()
-    */
-
     defer stmt.Close()
     if debug {
-        log.Printf("insert into RecordTable(id, value) values(%v, %v)\n", key, val)
+        log.Printf("insert into RecordTable(id, value) values(%s, %s)\n", key, val)
     }
     _, err = stmt.Exec(key, val)
 
@@ -231,14 +219,14 @@ func (s *SqlStore) InsertStringAndSymbol(silo *tagSilo, aStr string) {
     defer stmt.Close()
 
     _, err = stmt.Exec( silo.next_string_index, []byte(aStr))
-    //fmt.Printf("insert into StringTable(id, value) values(%v, %s)\n",silo.next_string_index, aStr)
+    //log.Printf("insert into StringTable(id, value) values(%v, %s)\n",silo.next_string_index, aStr)
     if err != nil {
         silo.LogChan["error"] <- fmt.Sprintln("While trying to insert ", aStr, " into StringTable as ", silo.next_string_index, " into ", silo.id, ": ", err)
     }
 
 
     silo.count("sql_insert")
-    //fmt.Printf("insert into SymbolTable(id, value) values(%s, %v)\n",aStr,  silo.next_string_index)
+    //log.Printf("insert into SymbolTable(id, value) values(%s, %v)\n",aStr,  silo.next_string_index)
     stmt, err = s.Db.Prepare("insert into SymbolTable(id, value) values(?, ?)")
 
     if err != nil {
@@ -266,10 +254,10 @@ func (s *SqlStore) GetRecordId(tagID int) []int {
     //log.Printf("Fetching %v", tagID)
     rows, err := s.Db.Query("select recordid from TagToRecord where tagid like ?", tagID)
     if err != nil {
-    if debug {
-        log.Printf("Failed to retrieve tag (%v) because %v", tagID, err)
-    }
-    return retarr
+        if debug {
+            log.Printf("Failed to retrieve tag (%v) because %v", tagID, err)
+        }
+        return retarr
     }
     defer rows.Close()
 
@@ -281,32 +269,69 @@ func (s *SqlStore) GetRecordId(tagID int) []int {
             retarr = append(retarr, res)
 
     }
-    //log.Printf("Would return %v\n", retarr)
+    //log.Printf("GetRecordId: Would return %v\n", retarr)
     return retarr
 }
 
 
+func (s *SqlStore) StoreTagToRecord(recordId int, fp fingerPrint)         {
+            stmt, err := s.Dbh().Prepare("insert or ignore into TagToRecord(tagid, recordid) values(?, ?)")
+            defer stmt.Close()
+            for _, v := range fp {
+                _, err = stmt.Exec(v, recordId)
+                if err != nil {
+                    log.Println("While trying to insert TagToRecord: ", err)
+                }
+                /*recordIDs := s.tagToRecordIDs(v)
+                recordIDs = append(recordIDs, s.last_database_record)
+                s.tag_cache[v] = recordIDs*/
+            }
+
+}
+
+
 func (s *SqlStore) StoreRecordId(key []byte, val []byte)  {
+    panic("Don't use this")
     stmt, err := s.Dbh().Prepare("insert or replace into TagToRecordTable(id, value) values(?, ?)")
     if err != nil {
         panic(fmt.Sprintln("While preparing to insert TagToRecordTable: ", err))
     }
 
-    stmt1, err1 := s.Dbh().Prepare("update TagToRecordTable SET value = ? where id like ? ")
-    if err1 != nil {
-        panic(fmt.Sprintln("While preparing to update TagToRecordTable: ", err1))
-    }
     defer stmt.Close()
-    defer stmt1.Close()
+    //log.Printf("insert or replace into TagToRecordTable(id, value) values(%s, %s)\n", key, val)
     _, err = stmt.Exec(key, val)
     if err != nil {
         panic(fmt.Sprintln("While trying to insert TagToRecordTable: ", err))
     }
-    _, err1 = stmt1.Exec(val, key)
-    if err1 != nil {
-        panic(fmt.Sprintf("Could not store record for key(%v) in TagToRecordTable: %v\n", key, err1))
-        return
-    }
 
-       //log(fmt.Sprintln("Added record to tag %v (%v)", s.getString(v), v))
+    //log(fmt.Sprintln("Added record to tag %v (%v)", s.getString(v), v))
 }
+
+/*
+Need to combine this with the above function
+		for _, v := range aRecord.Fingerprint {
+			//if !contains(tag2file[v], &line_elem) {
+
+			recordIDs := s.tagToRecordIDs(v)
+			recordIDs = append(recordIDs, s.last_database_record)
+
+			key := []byte(fmt.Sprintf("%v", v))
+
+			val, jerr := json.Marshal(recordIDs)
+
+			if jerr == nil {
+                s.Store.StoreRecordId(key, val)
+
+                s.count("sql_insert")
+                s.tag_cache[v] = recordIDs
+            } else {
+                s.LogChan["warning"] <- fmt.Sprintln("Failed to marshall json: %v", jerr)
+            }
+
+            if debug {
+                s.LogChan["warning"] <- fmt.Sprintln("Added record to tag %v (%v)", s.getString(v), v)
+            }
+
+			//}
+		}
+*/
