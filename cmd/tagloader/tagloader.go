@@ -129,7 +129,7 @@ func processFile(aPath string, fileNameFingerprint []string) {
 			//var totalLines = 0
 			for number, l := range lines {
 
-				f := tagbrowser.ReSplit([]string{"\n", " ", "/", ".", ",", "+", "_", "(", ")", "{", "}", "\"", "&", ";", ":", "-", "#", "!", "^", "'", "$", "=", "*", "[", "]", ">", "<", " ", "	"}, []string{strings.ToLower(l)})
+				f := tagbrowser.ReSplit([]string{"\n", " ", "/", ".", ",", "+", "_", "(", ")", "{", "}", "\"", "&", ";", ":", "-", "#", "!", "^", "'", "$", "=", "*", "[", "]", ">", "<", " ", "	","，", "。", "|", "」", "、", "「"}, []string{strings.ToLower(l)})
 				f = append(f, fileNameFingerprint...)
 				insertRec(aPath, number+1, f)
 				//	totalLines = number
