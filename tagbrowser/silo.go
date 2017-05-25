@@ -1009,7 +1009,7 @@ func (s *tagSilo) Checkpoint() {
 
 func (s *tagSilo) checkpointWorker() {
 	for {
-		time.Sleep(time.Second * 90.0)
+		time.Sleep(time.Second * 600.0)  //FIXME load time from config file
 		if s.dirty && s.Operational {
 			s.Checkpoint()
             s.LogChan["file"] <- fmt.Sprintf("Checkpoint complete for silo %v", s.id)
