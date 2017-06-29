@@ -1003,6 +1003,17 @@ func (s *tagSilo) Checkpoint() {
 	}
 	f.Sync()
 	f.Close()
+
+	f, _ = os.Create(fmt.Sprintf("%v.checkpoint.bak", s.filename))
+	enc = gob.NewEncoder(f)
+	encErr = enc.Encode(d)
+	if encErr != nil {
+		log.Println("Failed to checkpoint silo: ", encErr, " silo ", s.id)
+	}
+	f.Sync()
+	f.Close()
+
+
 	s.dirty = false
 	s.LockLog <- "Released checkpoint lock"
 }
@@ -1115,6 +1126,10 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 		silo.anotherbuffer = &aBuff
 		checkpointname := fmt.Sprintf("%v.checkpoint", silo.filename)
 		f, ferr := os.Open(checkpointname)
+        if ferr != nil {
+            checkpointname := fmt.Sprintf("%v.checkpoint.bak", silo.filename)
+            f, ferr = os.Open(checkpointname)
+        }
 		if ferr == nil {
 			silo.LogChan["file"] <- fmt.Sprintln(checkpointname, " exists, reading stored data")
 			defer f.Close()
