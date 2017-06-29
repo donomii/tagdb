@@ -176,14 +176,14 @@ func refreshTerm() {
 		itempos = 0
 		for i, elem := range results {
 			if dispLine < height-4 {
+				if !(i == 0) && !(elem.Filename == prevRecord.Filename) {
+					putStr(3, dispLine, fmt.Sprintf("%v", elem.Filename))
+					dispLine++
+				}
 				if itempos == selection {
 					putStr(0, dispLine, "*")
 					selectPosX = 0
 					selectPosY = dispLine
-				}
-				if !(i == 0) && !(elem.Filename == prevRecord.Filename) {
-					putStr(3, dispLine, fmt.Sprintf("%v", elem.Filename))
-					dispLine++
 				}
                 //if elem.Line != "-1" && strings.HasPrefix(elem.Filename, "http") {
                     putStr(1, dispLine, fmt.Sprintf("%v", elem.Score))
