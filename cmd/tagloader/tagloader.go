@@ -39,7 +39,12 @@ func wantContent(aPath string, fileSize int64) bool {
 	if match {
 		return false
 	} else {
-		return true
+        
+        if fileMatch.MatchString(aPath) {
+            return true
+        } else {
+            return false
+        }
 	}
 }
 
@@ -55,11 +60,11 @@ func DirWalk(directory string, aFunc func(string, string, string)) {
 	}
 	files, _ := dry.ListDirFiles(directory)
 	for _, file := range files {
-		if debug {
-			log.Println("Calling user function on path ", path.Join(directory, file))
-		}
-		filePath := path.Join(directory, file)
-		aFunc(filePath, directory, file)
+        filePath := path.Join(directory, file)
+        if debug {
+            log.Println("Calling user function on path ", path.Join(directory, file))
+        }
+        aFunc(filePath, directory, file)
 	}
 
 	//wg.Done()
@@ -125,22 +130,37 @@ func processFile(aPath string, fileNameFingerprint []string) {
 				//This probably isn't a text file
 				return
 			}
-			lines := regexp.MustCompile("\\n|\\r\\n").Split(content, 99999)
+            var lines []string
+            if everyLine {
+                lines = regexp.MustCompile("\\n|\\r\\n").Split(content, 99999)
+            } else {
+                lines = []string{content} //FIXME
+            }
 			//var totalLines = 0
+            tagCount := 0
 			for number, l := range lines {
 
-				f := tagbrowser.ReSplit([]string{"\n", " ", "/", ".", ",", "+", "_", "(", ")", "{", "}", "\"", "&", ";", ":", "-", "#", "!", "^", "'", "$", "=", "*", "[", "]", ">", "<", " ", "	","，", "。", "|", "」", "、", "「"}, []string{strings.ToLower(l)})
+				ff := tagbrowser.ReSplit([]string{"\n", " ", "/", ".", ",", "+", "_", "(", ")", "{", "}", "\"", "&", ";", ":", "-", "#", "!", "^", "'", "$", "=", "*", "[", "]", ">", "<", " ", "	","，", "。", "|", "」", "、", "「"}, []string{strings.ToLower(l)})
+                f := []string{}
+			    acceptableTag := regexp.MustCompile("^[a-zA-Z0-9]+$")
+                for _, v := range ff {
+                    if acceptableTag.Match([]byte(v)) {
+                        f = append(f, v)
+                    }
+                }
+                tagCount = tagCount + len(f)
 				f = append(f, fileNameFingerprint...)
 				insertRec(aPath, number+1, f)
 				//	totalLines = number
 			}
 			if verbose {
-				log.Printf("Loaded %v lines from %v", len(lines), aPath)
+				log.Printf("Loaded %v lines and %v tags from %v", len(lines), tagCount, aPath)
 			}
 
 		}
 	}
 }
+
 func makeArgs(aPath string, number int, f []string) *tagbrowser.InsertArgs {
 	url := slashes_regexp.ReplaceAllLiteralString(aPath, "/")
 	args := &tagbrowser.InsertArgs{fmt.Sprintf("%s", url), number, f}
@@ -173,7 +193,7 @@ func processPaths(aCh chan []string) {
 
 		fullPath := elem[0]
 		if verbose {
-			log.Println("Processing path ", fullPath)
+			//log.Println("Processing path ", fullPath)
 		}
         actuallyProcessFile(fullPath)
 		wg.Done()
@@ -198,6 +218,9 @@ func scanDir(aPath string, aCh chan []string) {
 }
 
 var numworkers = 1
+var everyLine bool
+var filePattern string
+var fileMatch *regexp.Regexp
 
 func main() {
 
@@ -207,9 +230,11 @@ func main() {
 	flag.BoolVar(&loadFromArgs, "addRecord", false, "Add record from the command line")
 	flag.BoolVar(&wantHelp, "help", false, "Display help")
 	flag.BoolVar(&verbose, "verbose", false, "Show files as they are loaded")
+	flag.BoolVar(&everyLine, "everyLine", false, "Register every line as a record, rather than treat the entire file as one line")
 	flag.BoolVar(&debug, "debug", false, "Display additional debug information")
 	flag.IntVar(&numworkers, "parallel", 1, "Maximum number of simultaneous inserts to attempt")
 	flag.StringVar(&tagbrowser.ServerAddress, "server", tagbrowser.ServerAddress, fmt.Sprintf("Server IP and Port.  Default: %s", tagbrowser.ServerAddress))
+	flag.StringVar(&filePattern, "accept", `.`, "Regexp filter for files.  e.g. 'txt$|doc$'")
 	flag.Parse()
 	dirs := flag.Args()
 	if len(dirs) < 1 || wantHelp {
@@ -223,6 +248,8 @@ func main() {
 		fmt.Println("	--verbose		Print extra information")
 		fmt.Println("	--debug			Print extra debug information")
 		fmt.Println("	--noContents	Add filenames to the database, but do not look at the contents of the files")
+		fmt.Println("	--everyLine		Treat every line in a file as a separate record, instead of mashing the whole file into one record.  Very slow, but more accurate.")
+		fmt.Println("")
 		fmt.Println("	--addRecord		Add a record directly from the command line.  The format is:")
 		fmt.Println("		path	The location (usually a URL)")
 		fmt.Println("		offset	An arbitrary number.  Can be index into the data")
@@ -240,6 +267,7 @@ func main() {
 	if noContents {
 		log.Println("Ignoring file contents, only loading file names")
 	}
+    fileMatch = regexp.MustCompile(filePattern)
 	var err error
 	if loadFromArgs {
 		index, _ := strconv.ParseInt(dirs[1], 0, 0)
