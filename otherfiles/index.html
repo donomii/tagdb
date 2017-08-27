@@ -1,0 +1,84 @@
+<html>
+	<head>
+		
+		
+		
+		
+		<script src="jquery.js" type="text/javascript" charset="utf-8">
+		</script>
+		
+		
+		<script src="jsonrpc.js" type="text/javascript" charset="utf-8">
+		</script>
+		
+		
+		<script type="text/javascript" charset="utf-8">
+			
+			
+			
+		</script>
+	</head>
+	<body>
+		<form>
+			Search:<br/>
+			<input type="text" id="searchText" name="searchText" onchange="doSearch(this.value);" onkeypress="doSearch(this.value);" onkeyup="doSearch(this.value);"/>
+			<br/>
+		</form>
+		
+		<div id=output name=output>
+		</div>
+		
+		<script type="text/javascript" charset="utf-8">
+			
+			$.jsonRPC.setup({
+			endPoint: '/rpc',
+			namespace: "TagResponder"
+			
+			});
+			function doSearch (val) {
+			
+			val = val + " "
+			theparams = {};
+			theparams.A = val;
+			theparams.Limit = 10;
+			
+			$.jsonRPC.request('SearchString', {
+			cache: false,
+			params: [{"A" :  val, "Limit" : 50}],
+			success: function(result) {
+			console.log(result.result.C)
+			$('#output').text("");
+			for (var i in result.result.C) {
+			var score = result.result.C[i].Score;
+			var url = result.result.C[i].Filename;
+			if (url.match(/http\:\/\//g)){
+				$('#output').html( $('#output').html() + "("+ score +") " + "<a href=\"" + url + "\" >"+ url + "</a>"  +"<br/>");
+				} else {
+					$('#output').html( $('#output').html() +  "("+ score +") " + "<a href=\"/files/" + url + "\" >"+ url + "</a>" +"<br/>" );
+					}
+					}
+					},
+					error: function(result) {
+					console.log("Error!")
+					console.log(result)
+					// Result is an RPC 2.0 compatible response object
+					}
+					}
+					);
+					}
+					
+					
+					$(document).ready(function(){
+						//setTimeout (function () {
+						if ($('#searchText').length >0) {
+							var b =$('#searchText');
+							var val =b.val(); 
+							doSearch(val);
+						}
+						//}, 2000);
+						});
+						
+					</script>
+				</body>
+			</html>
+			
