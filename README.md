@@ -12,7 +12,6 @@ Unfortunately, the loading process is quite slow right now.
     go build cmd/tagquery/tagquery.go
     go build cmd/tagserver/tagserver.go
     go build cmd/tagloader/tagloader.go
-    go build cmd/tagwebsite/tagloader.go
 
 ### Start
 
@@ -56,7 +55,7 @@ tagloader recursively scans files and directories, indexing their contents
       -verbose
             Show files as they are loaded
 
--verbose will print every filename as it is scanned, and -noContents will only load the file path (split up by usual word boundaries).
+-verbose will print every filename as it is scanned, and -noContents will ignore the file contents and only load the file path (split up by usual word boundaries).
 
 -noContents is handy for indexing things like mp3 collections.
 
