@@ -2,6 +2,7 @@
 
 package tagbrowser
 
+import "github.com/skratchdot/open-golang/open"
 import (
 	"bytes"
 	"io"
@@ -177,7 +178,7 @@ func (r *rpcRequest) Close() error {
 	return nil
 }
 
-// Call invokes the RPC request, waits for it to complete, and returns the results.
+// Call starts the RPC request, waits for it to complete, and returns the results.
 func (r *rpcRequest) Call() io.Reader {
 	if debug {
 		log.Printf("Processing json rpc request\n")
@@ -219,10 +220,12 @@ func rpc_server(serverAddress string) {
 	})
 
 	cwd, _ := os.Getwd()
-	log.Printf("Serving /files/ from:%s\n", cwd)
+	log.Printf("Serving /files/ from:%s on port 8181\n", cwd)
 
-	http.Handle("/", http.FileServer(http.Dir("tagweb")))
+	http.Handle("/", http.FileServer(http.Dir("webfiles")))
 	http.Handle("/files/", http.StripPrefix("/files/", http.FileServer(http.Dir(cwd))))
+	//Let's not do this until we have a login system figured out
+	//http.Handle("/datafiles/", http.StripPrefix("/datafiles/", http.FileServer(http.Dir("/"))))
 
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
@@ -233,7 +236,10 @@ func rpc_server(serverAddress string) {
 		defer pprof.StopCPUProfile()
 	}
 
-	go http.ListenAndServe(":80", nil)
+	go http.ListenAndServe(":8181", nil)
+	open.Start("http://localhost:8181/index.html")
+
+
 
 	for {
 		conn, err := l.Accept()
@@ -241,12 +247,12 @@ func rpc_server(serverAddress string) {
 			log.Fatal(err)
 		}
 		if debug {
-            log.Println("Got connection")
-        }
+		    log.Println("Got connection")
+		}
 		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
 		if debug {
 		    log.Println("Sent response, probably")
-        }
+		}
 	}
 
 }
