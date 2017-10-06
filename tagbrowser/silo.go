@@ -22,7 +22,7 @@ import (
 )
 
 func NewHash() *hashmap.HashMap {
-    return hashmap.New()
+    return hashmap.New(1)
 }
 
 func SetHash(h *hashmap.HashMap, key string, val int) {
