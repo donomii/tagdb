@@ -75,7 +75,7 @@ func main() {
 	var err error
 	rpcClient, err = jsonrpc.Dial("tcp", tagbrowser.ServerAddress)
 	if err != nil {
-		log.Printf("Failed to connect to %s, exiting\n", tagbrowser.ServerAddress)
+		log.Printf("Failed to connect to tagserver on %s, exiting\n", tagbrowser.ServerAddress)
 		os.Exit(1)
 	} else {
 
