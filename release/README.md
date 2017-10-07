@@ -1,3 +1,7 @@
+# TAGDB
+
+Search your files faster, from the command line or browser
+
 # Quickstart
 
 * Start tagserver.  This will open a search page for the database
