@@ -129,7 +129,7 @@ func (store *SqlStore) GetString(s *tagSilo, index int) string {
     s.count("string_cache_miss")
     s.count("sql_select")
 
-    err := store.Db.QueryRow("select value from StringTable where id like ?", index).Scan(&val)
+    err := store.Db.QueryRow("select value from StringTable where id = ?", index).Scan(&val)
     if err != nil {
         //s.LogChan["warning"] <- fmt.Sprintln("While trying to read StringTable: ", err)
     }
@@ -143,7 +143,7 @@ func (store *SqlStore) GetString(s *tagSilo, index int) string {
 func (s *SqlStore) GetSymbol(silo *tagSilo, aStr string) int {
     silo.count("sql_select")
     var res int
-    err := s.Db.QueryRow("select value from SymbolTable where id like ?", []byte(aStr)).Scan(&res)
+    err := s.Db.QueryRow("select value from SymbolTable where id = ?", []byte(aStr)).Scan(&res)
     if err != nil {
         //s.LogChan["warning"] <- fmt.Sprintln("While trying to read  ", aStr, " from SymbolTable: ", err)
     }
