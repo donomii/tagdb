@@ -614,14 +614,15 @@ func (s *tagSilo) get_diskdb_symbol(aStr string) (int, error) {
 }
 
 func (s *tagSilo) get_or_create_symbol(aStr string) int {
+	//Sometimes we get called before the object has been fully created, so wait for that
 	for i := 0; s == nil; i = i + 1 {
 		time.Sleep(time.Millisecond * 100)
 	}
 	//if val, ok := s.symbol_cache[aStr]; ok {
 	if val, ok := GetHash(s.symbol_cache, aStr); ok {
 		s.count("get/create_symbol_cache_hit")
-        var ret1 *int
-        ret1 = (*int)(val)
+		var ret1 *int
+		ret1 = (*int)(val)
 		return *ret1
 	} else {
 		s.count("get/create_symbol_cache_miss")
@@ -637,25 +638,25 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 			return val
 		} else {
 			if debug {
-						log.Println("Attempting lock in get_or_create_symbol")
-					}
-					s.LockMe()
-					defer func() {
-						s.UnlockMe()
-						if debug {
-							log.Println("Released lock in get_or_create_symbol")
-						}
-					}()
-					if debug {
-						log.Println("Got lock in get_or_create_symbol")
-					}
+				log.Println("Attempting lock in get_or_create_symbol")
+			}
+			s.LockMe()
+			defer func() {
+				s.UnlockMe()
+				if debug {
+					log.Println("Released lock in get_or_create_symbol")
+				}
+			}()
+			if debug {
+				log.Println("Got lock in get_or_create_symbol")
+			}
 			val, _ := s.get_symbol(aStr)
 			if val != 0 {
 				return val
 			} else {
 				s.next_string_index = s.next_string_index + 1
 				if !s.memory_db {
-                    s.Store.InsertStringAndSymbol(s, aStr)
+				    s.Store.InsertStringAndSymbol(s, aStr)
 				} else {
 					s.string_table.Insert(patricia.Prefix(aStr), s.next_string_index)
 					if s.next_string_index < len(s.reverse_string_table)-1 {
@@ -680,9 +681,8 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 
 				} else {
 					s.tag2file = append(s.tag2file, []*record{})
-
 				}
-                s.count("symbols")
+				s.count("symbols")
 				if debug {
 					log.Printf("Finished store\n")
 				}
