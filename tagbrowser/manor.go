@@ -53,36 +53,40 @@ func (m *Manor) SubmitRecord(r RecordTransmittable) {
 }
 
 func (m *Manor) scanFileDatabase(searchString string, maxResults int, exactMatch bool) []ResultRecordTransmittable {
+	log.Printf("Requesting %v results\n", maxResults)
 	results := ResultRecordTransmittableCollection{}
 	resLock := sync.Mutex{}
 	resLock.Lock()
 	pending := 0
+	log.Printf("Searching %v farms: %v", len(m.Farms), m.Farms)
 	for _, aFarm := range m.Farms {
 		if debug {
 			log.Printf("Searching Farm: %v", aFarm.location)
 		}
+		log.Printf("Searching Farm: %v", aFarm.location)
 		pending = pending + 1
-		go func() {
-			res := aFarm.scanFileDatabase(searchString, maxResults, exactMatch)
+		go func(threadFarm *Farm) {
+			res := threadFarm.scanFileDatabase(searchString, maxResults, exactMatch)
 			resLock.Lock()
 			defer resLock.Unlock()
+			log.Printf("Merging in resultset %v for farm %v", res, threadFarm.location)
 			for _, r := range res {
-				temp := IsIn(r, results)
-				if !temp {
-					results = append(results, r)
-				}
-			}
+					if ! IsIn(r, results) {
+						results = append(results, r)
 			sort.Sort(results)
 			if results.Len() > maxResults {
 				results = results[0 : maxResults-1]
+					}
+			}
 			}
 			pending = pending - 1
-		}()
+		}(aFarm)
 	}
 	resLock.Unlock()
 	for i := 0; pending > 0; i = i + 1 {
 		time.Sleep(1.0 * time.Millisecond)
 	}
+			sort.Sort(results)
 
 	return results
 }
