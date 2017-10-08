@@ -2,6 +2,7 @@ cd ../release || exit 1
 mkdir tagdb
 cp -r webfiles tagdb
 cp README.md tagdb
+cp tagdb.conf tagdb
 cd tagdb
 go build ../../cmd/tagshell/ && echo Built text UI
 go build ../../cmd/tagquery/ && echo Built command line query tool
