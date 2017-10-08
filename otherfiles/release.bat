@@ -1,7 +1,8 @@
 cd ..\release || exit 1
 mkdir tagdb
+mkdir tagdb\webfiles
 copy README.md tagdb
-copy /r webfiles tagdb
+copy webfiles tagdb\webfiles\
 copy tagdb.conf tagdb
 cd tagdb
 go build ../../cmd/tagshell/
