@@ -93,19 +93,19 @@ func (s *tagSilo) tagToRecordIDs(tagID int) []int {
 
 func (s *tagSilo) LockMe() {
 	if debug {
-        log.Println("Attempting lock in silo ", s.id)
+        //log.Println("Attempting lock in silo ", s.id)
     }
     //debugModule.PrintStack()
 	s.writeMutex.Lock()
 	if debug {
-        log.Println("Got lock in silo ", s.id)
+        //log.Println("Got lock in silo ", s.id)
     }
 
 }
 func (s *tagSilo) UnlockMe() {
 	s.writeMutex.Unlock()
 	if debug {
-        log.Println("Released lock in silo ", s.id)
+        //log.Println("Released lock in silo ", s.id)
     }
 
 }
@@ -420,7 +420,7 @@ func (s *tagSilo) scanRealFileDatabase(aFing searchPrint, maxResults int, exactM
 		log.Println("Starting database scan")
 	}
 	results := resultRecordCollection{}
-	currentLowest := 99999
+	//currentLowest := 99999
 	recordIDs := []int{}
 	filesHash := map[int]int{}
 	for _, p := range aFing.wanted {
@@ -447,11 +447,11 @@ func (s *tagSilo) scanRealFileDatabase(aFing searchPrint, maxResults int, exactM
 						res := resultRecord{s.getString(record.Filename), record.Line, record.Fingerprint, "", thisScore}
 						results = append(results, res)
 					} else {
-						//res := resultRecord{getString(elem.filename), elem.line, elem.fingerprint, "", thisScore}
-						//results = append(results, res)
-						//sort.Sort(results)
-						//results = results[0:11]
-						results, currentLowest = s.replaceLowest(results, &record, currentLowest, thisScore)
+						res := resultRecord{s.getString(record.Filename), record.Line, record.Fingerprint, "", thisScore}
+						results = append(results, res)
+						sort.Sort(results)
+						results = results[0:11]
+						//results, currentLowest = s.replaceLowest(results, &record, currentLowest, thisScore)
 					}
 
 				}
@@ -638,13 +638,13 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 			return val
 		} else {
 			if debug {
-				log.Println("Attempting lock in get_or_create_symbol")
+				//log.Println("Attempting lock in get_or_create_symbol")
 			}
 			s.LockMe()
 			defer func() {
 				s.UnlockMe()
 				if debug {
-					log.Println("Released lock in get_or_create_symbol")
+					//log.Println("Released lock in get_or_create_symbol")
 				}
 			}()
 			if debug {
@@ -743,20 +743,19 @@ func (s *tagSilo) replaceLowest(resultsList resultRecordCollection, candidate *r
 	return resultsList, currentLowest
 }
 
+/*
 func (s *tagSilo) scanDatabase(aFing searchPrint, maxResults int, exactMatch bool) resultRecordCollection {
 	//log.Println("Starting database scan")
 	results := resultRecordCollection{}
 	currentLowest := 99999
-	files := []*record{}
+	//files := []*record{}
 	filesHash := map[string]int{}
 	for _, p := range aFing.wanted {
 		for _, elem := range s.tag2file[p] {
 
-			files = append(files, elem)
-		}
-	}
+			//files = append(files, elem)
 
-	for _, elem := range files {
+	//for _, elem := range files {
 		stringKey := fmt.Sprintf("%v:%v", elem.Filename, elem.Line)
 		//log.Printf("%v:%v:%v", getString(elem.filename), stringKey, filesHash[stringKey])
 		if filesHash[stringKey] < 1 {
@@ -767,16 +766,21 @@ func (s *tagSilo) scanDatabase(aFing searchPrint, maxResults int, exactMatch boo
 					if len(results) < maxResults {
 						res := resultRecord{s.getString(elem.Filename), elem.Line, elem.Fingerprint, "", thisScore}
 						results = append(results, res)
+						if res.score < currentLowest {
+							currentLowest = res.score
+						}
 					} else {
-						//res := resultRecord{getString(elem.filename), elem.line, elem.fingerprint, "", thisScore}
-						//results = append(results, res)
-						//sort.Sort(results)
-						//results = results[0:11]
-						results, currentLowest = s.replaceLowest(results, elem, currentLowest, thisScore)
+						res := resultRecord{s.getString(elem.Filename), elem.Line, elem.Fingerprint, "", thisScore}
+						results = append(results, res)
+						sort.Sort(results)
+						results = results[0:maxResults]
+						//results, currentLowest = s.replaceLowest(results, elem, currentLowest, thisScore)
 					}
 
 				}
 			}
+		}
+	//}
 		}
 	}
 	//log.Println("Finished database scan")
@@ -789,6 +793,7 @@ func (s *tagSilo) scanDatabase(aFing searchPrint, maxResults int, exactMatch boo
 	//	}
 	return results
 }
+*/
 
 func (s *tagSilo) sumariseDatabase() (map[string]int, map[string]int) {
 	hist := map[string]int{}
@@ -820,6 +825,7 @@ func (s *tagSilo) sumariseDatabase() (map[string]int, map[string]int) {
 }
 
 func (s *tagSilo) makeFingerprint(fragments []string) fingerPrint {
+	sort.Strings(fragments)
 	frags := map[int]int{}
 
 	index := 0
@@ -941,22 +947,24 @@ func (s *tagSilo) monitorSiloWorker() {
 				return
 			}
 		}
-		if len(s.string_cache) > 10000 {
+		//if len(s.string_cache) > 10000 {
 			s.string_cache = map[int]string{}
 			s.count("string_cache_clear")
-		}
+		//}
 		/*if len(s.symbol_cache) > 10000 {
 			s.symbol_cache = map[string]int{}
 			s.count("symbol_cache_clear")
 		}*/
+		s.symbol_cache = NewHash()
+		s.count("symbol_cache_clear")
 
-		if len(s.tag_cache) > 10000 {
+		//if len(s.tag_cache) > 10000 {
 			s.tag_cache = map[int][]int{}
 			s.count("string_cache_clear")
-		}
+		//}
 
         s.counterMutex.Lock()
-		log.Println("Silo: ", s.filename, " : ", s.id, s.counters)
+	log.Println("Silo: ", s.filename, " : ", s.id, s.counters)
         s.counterMutex.Unlock()
 
 	}
