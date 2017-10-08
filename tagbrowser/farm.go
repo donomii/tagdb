@@ -145,6 +145,8 @@ func (f *Farm) SubmitRecord(r RecordTransmittable) {
 }
 
 func equalPrints(s1, s2 []string) bool {
+	sort.Strings(s1)
+	sort.Strings(s2)
 	if len(s1) != len(s2) {
 		return false
 	}
@@ -166,7 +168,7 @@ func (f *Farm) scanFileDatabase(searchString string, maxResults int, exactMatch 
 			log.Printf("Searching Silo: %v - %v", f.location, i)
 		}
 		pending = pending + 1
-		go func() {
+		go func(aSilo *tagSilo) {
 			if debug {
 				log.Printf("Starting search\n")
 			}
@@ -178,18 +180,17 @@ func (f *Farm) scanFileDatabase(searchString string, maxResults int, exactMatch 
 			resLock.Lock()
 			defer resLock.Unlock()
 			for _, r := range res {
-				temp := IsIn(r, results)
-				if !temp {
-					results = append(results, r)
-				}
-			}
-
+					if ! IsIn(r, results) {
+						results = append(results, r)
 			sort.Sort(results)
 			if results.Len() > maxResults {
 				results = results[0 : maxResults-1]
+					}
+				}
 			}
+
 			pending = pending - 1
-		}()
+		}(aSilo)
 	}
 
 	resLock.Unlock()
