@@ -423,13 +423,17 @@ func (s *tagSilo) scanRealFileDatabase(aFing searchPrint, maxResults int, exactM
 	//currentLowest := 99999
 	recordIDs := []int{}
 	filesHash := map[int]int{}
-	for _, p := range aFing.wanted {
+
+	//FIXME make this an option in the request
+	//for _, p := range aFing.wanted {
+
+	p := aFing.wanted[0]
 		rs := s.tagToRecordIDs(p)
 		for _, elem := range rs {
 
 			recordIDs = append(recordIDs, elem)
 		}
-	}
+	//}
 	if debug {
 		log.Printf("Found %v records that match search", len(recordIDs))
 	}
