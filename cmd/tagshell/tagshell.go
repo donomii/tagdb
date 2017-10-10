@@ -274,7 +274,9 @@ func doInput() {
 				case termbox.KeyArrowRight:
 					if isLinux() || isDarwin()  {
 						termbox.Close()
-						tagbrowser.Launch(results[selection].Filename, results[selection].Line)
+						line, _ := strconv.ParseInt(results[selection].Line, 10, 0)
+						if line < 0 { line = 0 }
+						tagbrowser.Launch(results[selection].Filename, fmt.Sprintf("%v", line))
 						/*cmd := exec.Command("bash", "-c", fmt.Sprintf("vim %v %v", results[selection].Filename, fmt.Sprintf("+%v", results[selection].Line)))
 						cmd.Stdout = os.Stdout
 						cmd.Stdin = os.Stdin
