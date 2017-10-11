@@ -13,7 +13,6 @@ import (
 	"log"
 	"net/rpc/jsonrpc"
 	"os"
-	"os/exec"
 	"time"
 	//"sort"
 	"net/rpc"
@@ -281,7 +280,6 @@ func doInput() {
 						refreshTerm()
 					} else {
 						tagbrowser.Launch(results[selection].Filename, fmt.Sprintf("%v", line))
-						cmd.Run()
 						refreshTerm()
 					}
 				case termbox.KeyArrowDown:
