@@ -272,26 +272,15 @@ func doInput() {
 				//debugStr = fmt.Sprintf("key: %v, %v, %v", ev.Key, ev.Ch, ev)
 				switch ev.Key {
 				case termbox.KeyArrowRight:
+					line, _ := strconv.ParseInt(results[selection].Line, 10, 0)
+					if line < 0 { line = 0 }
 					if isLinux() || isDarwin()  {
 						termbox.Close()
-						line, _ := strconv.ParseInt(results[selection].Line, 10, 0)
-						if line < 0 { line = 0 }
 						tagbrowser.Launch(results[selection].Filename, fmt.Sprintf("%v", line))
-						/*cmd := exec.Command("bash", "-c", fmt.Sprintf("vim %v %v", results[selection].Filename, fmt.Sprintf("+%v", results[selection].Line)))
-						cmd.Stdout = os.Stdout
-						cmd.Stdin = os.Stdin
-						cmd.Stderr = os.Stderr
-						cmd.Run()
-						*/
-						//err := cmd.Run()
-						//debugStr = fmt.Sprintf("%v(%v)\n", string(val), err)
-						//debugStr = fmt.Sprintf("%v(%v)\n", err)
-						//debugStr = fmt.Sprintf("%v %v %v", "vim", results[selection].filename, fmt.Sprintf("+%v", results[selection].line))
-						//debugStr = fmt.Sprintf("%v\n", cmd.Run())
 						termbox.Init()
 						refreshTerm()
 					} else {
-						cmd := exec.Command("C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe", results[selection].Filename)
+						tagbrowser.Launch(results[selection].Filename, fmt.Sprintf("%v", line))
 						cmd.Run()
 						refreshTerm()
 					}
