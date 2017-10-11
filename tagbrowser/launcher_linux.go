@@ -5,7 +5,8 @@ import "os/exec"
 import "fmt"
 
 func Launch(file string, line string) {
-	cmd := exec.Command("bash", "-c", fmt.Sprintf("vim %v %v", results[selection].Filename, fmt.Sprintf("+%v", results[selection].Line)))
+	cmd := exec.Command("bash", "-c", "vim", file, fmt.Sprintf("+%v", line))
+	//cmd := exec.Command("bash", "-c", fmt.Sprintf("vim %v %v", results[selection].Filename, fmt.Sprintf("+%v", results[selection].Line)))
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
