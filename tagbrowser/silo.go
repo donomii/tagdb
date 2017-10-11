@@ -427,12 +427,11 @@ func (s *tagSilo) scanRealFileDatabase(aFing searchPrint, maxResults int, exactM
 	//FIXME make this an option in the request
 	//for _, p := range aFing.wanted {
 
-	p := aFing.wanted[0]
+	if len(aFing.wanted) > 0 {
+		p := aFing.wanted[0]
 		rs := s.tagToRecordIDs(p)
-		for _, elem := range rs {
-
-			recordIDs = append(recordIDs, elem)
-		}
+		recordIDs = append(recordIDs, rs...)
+	}
 	//}
 	if debug {
 		log.Printf("Found %v records that match search", len(recordIDs))
