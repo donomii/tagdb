@@ -1,3 +1,4 @@
+#!/bin/sh
 cd ../release || exit 1
 mkdir tagdb
 cp -r webfiles tagdb
