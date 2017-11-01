@@ -1,8 +1,10 @@
 # tagdb
 
-Tagdb is an inverted index search engine that offers fast word completion, and real time searches.
+Tagdb is a text search engine that offers fast word completion, and real time searches.
 
 Unfortunately, the loading process is quite slow right now.
+
+Tagdb stores urls and tags, allowing you to index files, webpages, and anything else you can reasonably access via a url.  It can also store line numbers for a file, allowing you to jump straight to your search result.
 
 ## Installation
 
@@ -107,7 +109,7 @@ tagserver is the main database, which listens for JSON-RPC requests and servers 
 
 #### -config
 
-Read a different configuration file.  The default file is "tagdb.conf".
+Read a different configuration file.  The default file is "tagdb.conf", in the current directory.
 
 #### -preAlloc
 
