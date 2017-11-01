@@ -39,6 +39,12 @@ and you will see
 
 ## Use
 
+
+### tagshell
+
+tagshell is a simple command line GUI that uses predictive, real time search to list your results and jump to them.
+
+Start typing your search until you see the results you want, then press the down arrow to select the result you want to examine.  Then right arrow will open that file.
     
 ### tagloader
 
@@ -57,13 +63,17 @@ tagloader recursively scans files and directories, indexing their contents
       -verbose
             Show files as they are loaded
 
--verbose will print every filename as it is scanned, and -noContents will ignore the file contents and only load the file path (split up by usual word boundaries).
+-verbose will print every filename as it is scanned.
 
--noContents is handy for indexing things like mp3 collections.
+By default, tagloader will treat the entire contents of the file as one "search result".  It reads the entire file, building a tag list, and then stores that list.  There are two options to control this:
 
-Tagloader creates a record in the database, consisting of the tags generated, and the path to the file (based on the command line argument).  So if you give it a relative path, it will store relative paths, which will make it difficult to find the file again if you search for it while in another directory.
+-noContents will ignore the file contents and only store the file path (split up by usual word boundaries).  Searches will only return a file if your search word occurs in the file name.  -noContents is handy for indexing things like mp3 collections and photographs, where the contents contain no text.
 
-Relative paths are useful for things like indexing a webserver directory, so you can later build a full URL from the relative path and the server name.  Full paths are more useful if you plan to access the files from the same machine you loaded them from.
+-everyLine will store every line in a text file separately, so search results can return multiple lines in the same file.  You can then jump to the correct line using programs like tagshell.
+
+Tagloader creates a record in the database using on the path to the file (based on the command line argument).  It does no further processing of the path, and won't even normalise it.  So if you give it a relative path, it will store relative paths, which will make it difficult to find the file again if you search for it while in another directory.
+
+Relative paths are useful for things like indexing a webserver directory, so you can later build a full URL from the relative path and the server name.  Absolute paths are more useful if you plan to access the files from the command line or other programs.
 
 
 ### tagquery
@@ -83,11 +93,11 @@ tagquery searches the database, and can also command the database to shutdown
 
 #### -completeMatch
 
-By default, if a record matches some of the tags you provided, it will be returned (with a lower score than if you matched all the tags).  If you get too many records returned, and they aren't relevent, you can request -completeMatch.  -completeMatch will only return records where all your search terms match all the tags for the record.
+By default, tagdb shows you partial matches.  If a record matches some of the tags you provided, it will be returned (with a lower score than if you matched all the tags).  This is slower and clutters up the results, so you can request -completeMatch.  -completeMatch will only return records where all your search terms match all the tags for the record.
 
 #### -shutdown
 
-Order the server to quit.  This will take several seconds or minutes or more, depending on which storage layer you chose for your data.
+Order the server to quit.  This will take several seconds or minutes, depending on which storage layer you chose for your data.
 
 #### -status
 
@@ -128,8 +138,3 @@ Example:
 
     ./fetchbot --match "rock" -debug https://www.rockpapershotgun.com/
 
-### tagshell
-
-tagshell is a simple command line GUI that uses predictive, real time search to list your results and jump to them.
-
-Start typing your search until you see the results you want, then press the down arrow to select the result you want to examine.  Then right arrow will open that file.
