@@ -52,9 +52,9 @@
 			var score = result.result.C[i].Score;
 			var url = result.result.C[i].Filename;
 			if (url.match(/http\:\/\//g)){
-				$('#output').html( $('#output').html() + "("+ score +") " + "<a href=\"" + url + "\" >"+ url + "</a>"  +"<br/>");
+				$('#output').html( $('#output').html() + "(Score: "+ score +") " + "<a href=\"" + url + "\" >"+ url + "</a>"  +"<br/>");
 				} else {
-					$('#output').html( $('#output').html() +  "("+ score +") " + "<a href=\"/files/" + url + "\" >"+ url + "</a>" +"<br/>" );
+					$('#output').html( $('#output').html() +  "(Score: "+ score +") " + "<a href=\"/files/" + url + "\" >"+ url + "</a>" +"<br/>" );
 					}
 					}
 					},
