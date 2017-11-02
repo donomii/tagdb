@@ -223,9 +223,8 @@ func rpc_server(serverAddress string) {
 	log.Printf("Serving /files/ from:%s on port 8181\n", cwd)
 
 	http.Handle("/", http.FileServer(http.Dir("webfiles")))
+	//FIXME
 	http.Handle("/files/", http.StripPrefix("/files/", http.FileServer(http.Dir(cwd))))
-	//Let's not do this until we have a login system figured out
-	//http.Handle("/datafiles/", http.StripPrefix("/datafiles/", http.FileServer(http.Dir("/"))))
 
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
