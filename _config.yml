@@ -1,1 +1,4 @@
 theme: jekyll-theme-minimal
+title: tagDB
+description: A personal search engine
+show_downloads: true
