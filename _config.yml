@@ -2,3 +2,4 @@ theme: jekyll-theme-minimal
 title: tagDB
 description: A personal search engine
 show_downloads: true
+google_analytics: "UA-63812845-3"
