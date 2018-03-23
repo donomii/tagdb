@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
-	"github.com/boltdb/coalescer"
 	"github.com/tchap/go-patricia/patricia"
 )
 
@@ -238,7 +237,6 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 		}
 		s.LockMe()
 		defer s.UnlockMe()
-		s.coalescer.Update(func(tx *bolt.Tx) error {
 			//s.LogChan["transport"] <-fmt.Sprintln("Storing record with ", len(aRecord.Fingerprint), " tags")
 			for _, v := range aRecord.Fingerprint {
 				//if !contains(tag2file[v], &line_elem) {
@@ -286,7 +284,6 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 				log.Printf("Could not store record for key(%v): %v\n", key, err)
 			}
 			return err
-		})
 
 		if debug {
 			log.Println("storeFileRecord waiting for input")
@@ -693,7 +690,6 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 					//defer func() { s.writeMutex.Unlock(); log.Println("Released lock in get_or_create_symbol") }()
 					//log.Println("Got lock in get_or_create_symbol")
 					s.count("boltdb_update")
-					s.coalescer.Update(func(tx *bolt.Tx) error {
 						b, err := tx.CreateBucketIfNotExists([]byte("StringTable"))
 						s.count("boltdb_put")
 						err = b.Put([]byte(fmt.Sprintf("%v", s.next_string_index)), []byte(aStr))
@@ -703,7 +699,6 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 						err = b.Put([]byte(aStr), []byte(fmt.Sprintf("%v", s.next_string_index)))
 
 						return err
-					})
 				} else {
 					s.string_table.Insert(patricia.Prefix(aStr), s.next_string_index)
 					if s.next_string_index < len(s.reverse_string_table)-1 {
@@ -1169,14 +1164,6 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 			log.Fatal(err)
 		}
 
-		c, cerr := coalescer.New(silo.dbHandle, 10, 100.0*time.Millisecond)
-		if cerr != nil {
-			log.Println("Could not create coalescer")
-			os.Exit(1)
-		}
-		silo.coalescer = c
-
-		silo.coalescer.Update(func(tx *bolt.Tx) error {
 			silo.LogChan["file"] <- fmt.Sprintln("Setting up bolt database")
 			stringBucket, err := tx.CreateBucketIfNotExists([]byte("StringTable"))
 			if err != nil {
@@ -1228,7 +1215,6 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 			})
 
 			return err
-		})
 		go silo.storeFileRecordWorker()
 	}
 	silo.threadsWait.Add(1)
