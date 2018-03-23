@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/donomii/tagdb.svg?branch=master)](https://travis-ci.org/donomii/tagdb)
+[![GoDoc](https://godoc.org/github.com/donomii/tagdb?status.svg)](https://godoc.org/github.com/donomii/tagdb)
+
 # tagdb
 
 Tagdb is a text search engine that offers fast word completion, and real time searches.
