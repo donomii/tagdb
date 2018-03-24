@@ -174,7 +174,7 @@ func (s *SqlStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) {
 	_, err = stmt.Exec(key, val)
 
 	if err != nil {
-		silo.LogChan["warning"] <- fmt.Sprintln("While trying to insert RecordTable: %v", err)
+		silo.LogChan["warning"] <- fmt.Sprintf("While trying to insert RecordTable: %v", err)
 		silo.LogChan["warning"] <- fmt.Sprintf("Could not store record for key(%v): %v\n", key, err)
 		return
 	}
