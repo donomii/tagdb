@@ -1,9 +1,9 @@
 // errortest.go
 package tagbrowser
 
-func errTest() searchPrint {
+func errTest() []searchPrint {
 	frags := map[int]int{}
-	searchP := searchPrint{}
+	searchP := []searchPrint{}
 	for k, v := range frags {
 		if v > 0 {
 			searchP.wanted = append(searchP, k)
