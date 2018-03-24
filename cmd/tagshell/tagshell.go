@@ -2,17 +2,17 @@
 package main
 
 import (
-"github.com/donomii/tagdb/tagbrowser"
-    //"strings"
-    "runtime"
-    "strconv"
-    "io"
-    "bufio"
+	"github.com/donomii/tagdb/tagbrowser"
+	//"strings"
+	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/rpc/jsonrpc"
 	"os"
+	"runtime"
+	"strconv"
 	"time"
 	//"sort"
 	"net/rpc"
@@ -21,7 +21,6 @@ import (
 
 	"sync"
 )
-
 
 var serverActive = false
 
@@ -46,26 +45,25 @@ var predictResults []string
 
 var refreshMutex sync.Mutex
 
-
 var LineCache map[string]string
 
 func FetchLine(f string, lineNum int) (line string, lastLine int, err error) {
-    key := fmt.Sprintf("%v%v", f, lineNum)
-    if val, ok := LineCache[key]; ok {
-        return val, -1, nil
-    } else {
-        r, _ := os.Open(f)
-        sc := bufio.NewScanner(r)
-        for sc.Scan() {
-            lastLine++
-            if lastLine == lineNum {
-                LineCache[key] = sc.Text()
-                return sc.Text(), lastLine, sc.Err()
-            }
-        }
-        LineCache[key] = line
-        return line, lastLine, io.EOF
-    }
+	key := fmt.Sprintf("%v%v", f, lineNum)
+	if val, ok := LineCache[key]; ok {
+		return val, -1, nil
+	} else {
+		r, _ := os.Open(f)
+		sc := bufio.NewScanner(r)
+		for sc.Scan() {
+			lastLine++
+			if lastLine == lineNum {
+				LineCache[key] = sc.Text()
+				return sc.Text(), lastLine, sc.Err()
+			}
+		}
+		LineCache[key] = line
+		return line, lastLine, io.EOF
+	}
 }
 
 //Contact server with search string
@@ -78,7 +76,7 @@ func search(searchTerm string, numResults int) []tagbrowser.ResultRecordTransmit
 	err := client.Call("TagResponder.SearchString", args, preply)
 	if err != nil {
 		//log.Fatal("RPC error:", err)
-		statuses["Status"] = fmt.Sprintf("RPC error:", err)
+		statuses["Status"] = fmt.Sprintf("RPC error: %v", err)
 	} else {
 		statuses["Status"] = "Search complete"
 	}
@@ -95,7 +93,7 @@ func predictString(searchTerm string) []string {
 	err := client.Call("TagResponder.PredictString", args, preply)
 	if err != nil {
 		//log.Println("RPC error:", err)
-		statuses["Status"] = fmt.Sprintf("RPC error:", err)
+		statuses["Status"] = fmt.Sprintf("RPC error: %v", err)
 	} else {
 		statuses["Status"] = "Predict complete"
 	}
@@ -142,15 +140,14 @@ func status() {
 }
 
 var completeMatch = false
-func isLinux() bool {
-    return (runtime.GOOS == "linux")
-}
 
+func isLinux() bool {
+	return (runtime.GOOS == "linux")
+}
 
 func isDarwin() bool {
-    return (runtime.GOOS == "darwin")
+	return (runtime.GOOS == "darwin")
 }
-
 
 func refreshTerm() {
 	if !serverActive {
@@ -184,15 +181,15 @@ func refreshTerm() {
 					selectPosX = 0
 					selectPosY = dispLine
 				}
-                //if elem.Line != "-1" && strings.HasPrefix(elem.Filename, "http") {
-                    putStr(1, dispLine, fmt.Sprintf("%v", elem.Score))
-                    l, _:= strconv.Atoi(elem.Line)
-                    LineStr, _, _ := FetchLine(elem.Filename, l)
-                    putStr(8, dispLine, fmt.Sprintf("(line %v) %v", elem.Line,  LineStr))
-                    dispLine++
-                    itempos++
-                    prevRecord = elem
-                //}
+				//if elem.Line != "-1" && strings.HasPrefix(elem.Filename, "http") {
+				putStr(1, dispLine, fmt.Sprintf("%v", elem.Score))
+				l, _ := strconv.Atoi(elem.Line)
+				LineStr, _, _ := FetchLine(elem.Filename, l)
+				putStr(8, dispLine, fmt.Sprintf("(line %v) %v", elem.Line, LineStr))
+				dispLine++
+				itempos++
+				prevRecord = elem
+				//}
 			}
 		}
 		putStr(1, height-3, fmt.Sprintf("%v results", len(results)))
@@ -244,7 +241,6 @@ func searchRight(aStr string, pos int) int {
 	return len(aStr) - 1
 }
 
-
 func extractWord(aLine string, pos int) string {
 	start := searchLeft(aLine, pos)
 	return aLine[start:pos]
@@ -272,8 +268,10 @@ func doInput() {
 				switch ev.Key {
 				case termbox.KeyArrowRight:
 					line, _ := strconv.ParseInt(results[selection].Line, 10, 0)
-					if line < 0 { line = 0 }
-					if isLinux() || isDarwin()  {
+					if line < 0 {
+						line = 0
+					}
+					if isLinux() || isDarwin() {
 						termbox.Close()
 						tagbrowser.Launch(results[selection].Filename, fmt.Sprintf("%v", line))
 						termbox.Init()
@@ -284,15 +282,15 @@ func doInput() {
 					}
 				case termbox.KeyArrowDown:
 					selection++
-                    if selection > len(results) {
-                        selection = len(results)
-                    }
+					if selection > len(results) {
+						selection = len(results)
+					}
 					focus = "selection"
 				case termbox.KeyArrowUp:
 					selection--
-                    if selection < 0 {
-                        selection = 0
-                    }
+					if selection < 0 {
+						selection = 0
+					}
 					focus = "selection"
 				case termbox.KeyEsc:
 					shutdown()
@@ -337,6 +335,7 @@ func doInput() {
 func foreGround() termbox.Attribute {
 	return termbox.ColorBlack
 }
+
 //Background colour
 func backGround() termbox.Attribute {
 	return termbox.ColorWhite
@@ -390,7 +389,7 @@ func shutdown() {
 
 }
 func main() {
-    LineCache = map[string]string{}
+	LineCache = map[string]string{}
 	flag.StringVar(&tagbrowser.ServerAddress, "server", tagbrowser.ServerAddress, fmt.Sprintf("Server IP and Port.  Default: %s", tagbrowser.ServerAddress))
 	flag.Parse()
 	//terms := flag.Args()

@@ -1,10 +1,7 @@
 package main
 
 import (
-    "unicode/utf8"
 	"bytes"
-    "github.com/donomii/tagdb/tagbrowser"
-    "unicode"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -17,6 +14,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/donomii/tagdb/tagbrowser"
 
 	"golang.org/x/net/html"
 
@@ -52,14 +53,13 @@ var urlCh chan string
 var rpcClient *rpc.Client
 var debug = false
 
-
 func hasSymbol(str string) bool {
-    for _, letter := range str {
-        if unicode.IsSymbol(letter) {
-            return true
-        }
-    }
-    return false
+	for _, letter := range str {
+		if unicode.IsSymbol(letter) {
+			return true
+		}
+	}
+	return false
 }
 
 func main() {
@@ -109,80 +109,79 @@ func handler(ctx *fetchbot.Context, res *http.Response, err error) {
 	defer res.Body.Close()
 	defer func() {
 		if r := recover(); r != nil {
-			fmt.Println("Failed to process url, because %v", r)
+			fmt.Printf("Failed to process url, because %v\n", r)
 		}
 	}()
 	body, err := ioutil.ReadAll(res.Body)
-    if !utf8.Valid(body) {
-        log.Println("Rejecting ", ctx.Cmd.URL(), " due to invalid unicode characters")
-    } else {
-        log.Printf("[%d] %s %s\n", res.StatusCode, ctx.Cmd.Method(), ctx.Cmd.URL())
+	if !utf8.Valid(body) {
+		log.Println("Rejecting ", ctx.Cmd.URL(), " due to invalid unicode characters")
+	} else {
+		log.Printf("[%d] %s %s\n", res.StatusCode, ctx.Cmd.Method(), ctx.Cmd.URL())
 
-        //fmt.Println(string(body))
-        body = []byte(RemoveTags(string(body)))
-        f := tagbrowser.RegSplit(strings.ToLower(string(body)), tagbrowser.FragsRegex)
+		//fmt.Println(string(body))
+		body = []byte(RemoveTags(string(body)))
+		f := tagbrowser.RegSplit(strings.ToLower(string(body)), tagbrowser.FragsRegex)
 
-        filtered := []string{}
-        for _, x := range f {
-            if !hasSymbol(x) {
-                filtered = append(filtered, x)
-            }
-        }
+		filtered := []string{}
+		for _, x := range f {
+			if !hasSymbol(x) {
+				filtered = append(filtered, x)
+			}
+		}
 
-        args := &tagbrowser.InsertArgs{fmt.Sprintf("%s", ctx.Cmd.URL()), -1, filtered}
-        reply := &tagbrowser.SuccessReply{}
-        rpcClient, err = jsonrpc.Dial("tcp", tagbrowser.ServerAddress)
-        if err != nil {
-            log.Printf("Failed to connect to %s, exiting\n", tagbrowser.ServerAddress)
-            return
-        } else {
+		args := &tagbrowser.InsertArgs{fmt.Sprintf("%s", ctx.Cmd.URL()), -1, filtered}
+		reply := &tagbrowser.SuccessReply{}
+		rpcClient, err = jsonrpc.Dial("tcp", tagbrowser.ServerAddress)
+		if err != nil {
+			log.Printf("Failed to connect to %s, exiting\n", tagbrowser.ServerAddress)
+			return
+		} else {
 
-            log.Printf("Connected to tagserver on %s\n", tagbrowser.ServerAddress)
-        }
-        rpcClient.Call("TagResponder.InsertRecord", args, reply)
+			log.Printf("Connected to tagserver on %s\n", tagbrowser.ServerAddress)
+		}
+		rpcClient.Call("TagResponder.InsertRecord", args, reply)
 
-        var (
-            anchorTag = []byte{'a'}
-            hrefTag   = []byte("href")
-            //httpTag   = []byte("http")
-        )
+		var (
+			anchorTag = []byte{'a'}
+			hrefTag   = []byte("href")
+			//httpTag   = []byte("http")
+		)
 
-        bodyR := bytes.NewReader(body)
-        //defer bodyR.Close()
-        tkzer := html.NewTokenizer(bodyR)
+		bodyR := bytes.NewReader(body)
+		//defer bodyR.Close()
+		tkzer := html.NewTokenizer(bodyR)
 
-        for {
-            switch tkzer.Next() {
-            case html.ErrorToken:
-                // HANDLE ERROR
-                return
+		for {
+			switch tkzer.Next() {
+			case html.ErrorToken:
+				// HANDLE ERROR
+				return
 
-            case html.StartTagToken:
-                tag, hasAttr := tkzer.TagName()
-                if hasAttr && bytes.Equal(anchorTag, tag) { // a
-                    // HANDLE ANCHOR
-                    key, val, _ := tkzer.TagAttr()
-                    if bytes.Equal(hrefTag, key) { // href, http(s)
-                        // HREF TAG
-                        //fmt.Printf("%s, %s\n", key, val)
-                        parentURL := ctx.Cmd.URL()
-                        href, _ := url.Parse(fmt.Sprintf("%s", val))
-                        //log.Printf("Found href: %s\n", href)
+			case html.StartTagToken:
+				tag, hasAttr := tkzer.TagName()
+				if hasAttr && bytes.Equal(anchorTag, tag) { // a
+					// HANDLE ANCHOR
+					key, val, _ := tkzer.TagAttr()
+					if bytes.Equal(hrefTag, key) { // href, http(s)
+						// HREF TAG
+						//fmt.Printf("%s, %s\n", key, val)
+						parentURL := ctx.Cmd.URL()
+						href, _ := url.Parse(fmt.Sprintf("%s", val))
+						//log.Printf("Found href: %s\n", href)
 
-                        urlCh <- fmt.Sprintf("%s", parentURL.ResolveReference(href))
-                    }
+						urlCh <- fmt.Sprintf("%s", parentURL.ResolveReference(href))
+					}
 
-                }
-            }
-        }
-    }
+				}
+			}
+		}
+	}
 	log.Printf("Finished %s\n", ctx.Cmd.URL())
 
 }
 
-
 func RemoveTags(body string) string {
-    r := regexp.MustCompile(`<.*?>`)
-    unTaggedBody := r.ReplaceAllString(body, "")
-    return unTaggedBody
+	r := regexp.MustCompile(`<.*?>`)
+	unTaggedBody := r.ReplaceAllString(body, "")
+	return unTaggedBody
 }

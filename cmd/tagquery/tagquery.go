@@ -2,13 +2,14 @@
 package main
 
 import (
-"github.com/donomii/tagdb/tagbrowser"
 	"flag"
 	"fmt"
 	"log"
 	"net/rpc/jsonrpc"
 	"os"
 	"strings"
+
+	"github.com/donomii/tagdb/tagbrowser"
 )
 
 func search(terms []string, displayFingerprint bool) {
@@ -73,7 +74,7 @@ func status() {
 	if err != nil {
 		log.Fatal("RPC error:", err)
 	}
-	fmt.Println("Top tags, by the number of files they occur in: \n")
+	fmt.Println("Top tags, by the number of files they occur in:")
 	for k, v := range treply.TopTags {
 		log.Println(k, ":", v)
 	}

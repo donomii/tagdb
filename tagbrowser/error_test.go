@@ -1,12 +1,6 @@
 // errortest.go
 package tagbrowser
 
-type fingerPrint []int
-type searchPrint struct {
-	wanted   fingerPrint
-	unwanted fingerPrint
-}
-
 func errTest() searchPrint {
 	frags := map[int]int{}
 	searchP := searchPrint{}
