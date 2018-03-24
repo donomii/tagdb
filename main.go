@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	_ "github.com/BurntSushi/toml"
 	_ "github.com/PuerkitoBio/fetchbot"
