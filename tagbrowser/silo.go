@@ -30,7 +30,8 @@ func SetHash(h *hashmap.HashMap, key string, val int) {
 }
 
 func GetHash(h *hashmap.HashMap, key string) (unsafe.Pointer, bool) {
-    return h.GetStringKey(key)
+    v, ok := h.GetStringKey(key)
+	return v.(unsafe.Pointer),ok
 }
 
 
