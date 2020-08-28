@@ -127,8 +127,8 @@ func refreshTerm() {
 		for i, elem := range results {
 			if dispLine < height-4 {
 				if !(i == 0) && !(elem.Filename == prevRecord.Filename) {
-					//putStr(3, dispLine, fmt.Sprintf("%v", elem.Filename))
-					putStr(3, dispLine, fmt.Sprintf("%v", elem.Sample))
+					putStr(3, dispLine, fmt.Sprintf("%v", elem.Filename))
+					//putStr(3, dispLine, fmt.Sprintf("%v", elem.Sample))
 					dispLine++
 				}
 				if itempos == selection {
@@ -412,22 +412,30 @@ func main() {
 	go automaticdoInput()
 
 	statuses["Input"] = "Reading"
-	//lines := slurpSTDIN()
+
 	linesTr = []ResultRecordTransmittable{}
-
-	filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
-
-		fileBytes, err := ioutil.ReadFile(path)
-
-		lines := strings.Split(string(fileBytes), "\n")
-
+	if searchDir == "-" {
+		lines := slurpSTDIN()
 		for lineNum, l := range lines {
-			r := ResultRecordTransmittable{path, fmt.Sprintf("%v", lineNum), MakeFingerprintFromData(l), l, "0"}
+			r := ResultRecordTransmittable{"STDIN", fmt.Sprintf("%v", lineNum), MakeFingerprintFromData(l), l, "0"}
 			linesTr = append(linesTr, r)
 		}
-		//statuses["File"] = path
-		return nil
-	})
+	} else {
+		filepath.Walk(searchDir, func(fpath string, f os.FileInfo, err error) error {
+			path := fpath
+			fileBytes, err := ioutil.ReadFile(path)
+
+			lines := strings.Split(string(fileBytes), "\n")
+
+			for lineNum, l := range lines {
+				r := ResultRecordTransmittable{path, fmt.Sprintf("%v", lineNum), MakeFingerprintFromData(fmt.Sprintf("%v %v", l, path)), l, "0"}
+				//log.Printf("%+v\n", r)
+				linesTr = append(linesTr, r)
+			}
+			//statuses["File"] = path
+			return nil
+		})
+	}
 	statuses["Input"] = "Complete"
 	results = search(searchStr, 50)
 	refreshTerm()

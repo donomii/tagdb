@@ -72,8 +72,8 @@ func RegSplit(text string, reg *regexp.Regexp) []string {
 
 }
 
-var FragsRegex = regexp.MustCompile(`(\s+|,+|;+|:+|"+|'+|\.|/+|\+|_+|=+|}+|{+|>+|<+|!+|\)+|\(+)`)          //regexp.MustCompile("(\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+|:|,|\"|{|}|>|<|!|))")
-var SearchFragsRegex = regexp.MustCompile(`(\s+|-+|,+|;+|:+|"+|'+|\.|/+|\+|_+|=+|}+|{+|>+|<+|!+|\)+|\(+)`) //regexp.MustCompile("(\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+|:|,|\"|{|}|>|<|!|))")
+var FragsRegex = regexp.MustCompile(`(\s+|,+|;+|:+|-+|"+|'+|\.+|/+|\+|\\+|/+|_+|=+|}+|{+|>+|<+|!+|\)+|\(+)`) //regexp.MustCompile("(\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+|:|,|\"|{|}|>|<|!|))")
+var SearchFragsRegex = regexp.MustCompile(`(\s+|,+|;+|:+|"+|'+|\.+|/+|\+|_+|=+|}+|{+|>+|<+|!+|\)+|\(+)`)     //regexp.MustCompile("(\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+|:|,|\"|{|}|>|<|!|))")
 
 func MakeFingerprintFromData(aStr string) FingerPrint {
 	//seps := []string{"\\\\", "\\.", " ", "\\(", "\\)", "/", "_", "\\b"} //\\b|\\p{Z}+|\\p{C}|\\s+|\\/+|\\.+|\\\\+|_+
