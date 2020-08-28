@@ -2,16 +2,13 @@
 package main
 
 import (
+	"io/ioutil"
 	"log"
-	"regexp"
-	"sort"
+	"path/filepath"
 	"strings"
-
-	"github.com/donomii/tagdb/tagbrowser"
 
 	//"strings"
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -31,7 +28,7 @@ var serverActive = false
 var use_gui = true
 
 var statuses map[string]string
-var results []tagbrowser.ResultRecordTransmittable
+var results []ResultRecordTransmittable
 
 var selection = 0
 var itempos = 0
@@ -47,7 +44,7 @@ var client *rpc.Client
 
 var predictResults []string
 var lines []string
-var linesTr []tagbrowser.ResultRecordTransmittable
+var linesTr []ResultRecordTransmittable
 
 var refreshMutex sync.Mutex
 
@@ -72,160 +69,18 @@ func FetchLine(f string, lineNum int) (line string, lastLine int, err error) {
 	}
 }
 
-func score(a searchPrint, b tagbrowser.ResultRecordTransmittable) int {
-	score := 0
-	//We can do much better than a nested loop here
-
-	for _, vv := range b.Fingerprint {
-		for _, v := range a.wanted {
-			if v == vv {
-				score += 1
-
-			}
-
-		}
-		for _, v := range a.unwanted {
-			if v == vv {
-				score -= 1
-
-			}
-
-		}
-	}
-	//fmt.Println("----")
-	return score
-}
-
-type fingerPrint []string
-
-func RegSplit(text string, reg *regexp.Regexp) []string {
-	/*
-		indexes := reg.FindAllStringIndex(text, -1)
-		laststart := 0
-		result := make([]string, len(indexes)+1)
-		for i, element := range indexes {
-			result[i] = text[laststart:element[0]]
-			laststart = element[1]
-		}
-		result[len(indexes)] = text[laststart:len(text)]
-		return result
-	*/
-
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-	text = reg.ReplaceAllString(text, " ")
-
-	result := strings.Split(text, " ")
-	//log.Println("Split results:", result)
-	return result
-
-}
-
-var FragsRegex = regexp.MustCompile(`(\s+|,+|;+|:+|"+|'+|\.|/+|\+|-+|_+|=+|}+|{+|>+|<+|!+|\)+|\(+)`) //regexp.MustCompile("(\\/+|\\.+|\\\\+|\\-+|\\_+|_+|\\\\(|\\\\|\\p{Z}+|\\p{C}|\\s+|:|,|\"|{|}|>|<|!|))")
-
-func makeFingerprintFromData(aStr string) fingerPrint {
-	//seps := []string{"\\\\", "\\.", " ", "\\(", "\\)", "/", "_", "\\b"} //\\b|\\p{Z}+|\\p{C}|\\s+|\\/+|\\.+|\\\\+|_+
-	//return makeFingerprint(ReSplit(seps, strings.Fields(strings.ToLower(aStr))))
-
-	return makeFingerprint(RegSplit(strings.ToLower(aStr), FragsRegex))
-}
-
-func makeFingerprint(fragments []string) fingerPrint {
-	sort.Strings(fragments)
-	frags := map[string]int{}
-
-	index := 0
-	for _, f := range fragments {
-
-		if len(f) > 1 && len(f) < maxTagLength {
-
-			key, _ := calcRawScore(f)
-			_, ok := frags[key]
-			if !ok {
-				frags[key] = index
-				index = index + 1
-			}
-		} else {
-			if len(f) > maxTagLength {
-				//				s.LogChan["warning"] <- fmt.Sprintln("Rejecting tag as too long: ", f)
-			}
-		}
-
-	}
-	//log.Printf("Fingerprint of length: %v", index)
-	fingerprint := make(fingerPrint, index)
-	for k, i := range frags {
-		//fingerprint = append(fingerprint, k)
-		//log.Printf("Assigning to index %v", i)
-		fingerprint[i] = k
-	}
-
-	return fingerprint
-}
-
-type searchPrint struct {
-	wanted   fingerPrint
-	unwanted fingerPrint
-}
-
-func calcRawScore(aStr string) (string, int) {
-	if aStr[len(aStr)-1:len(aStr)] == "-" {
-		return aStr[0 : len(aStr)-1], -1
-	} else {
-		return aStr, 1
-	}
-}
-
-var maxTagLength = 100
-
-func makeSearchPrint(fragments []string) searchPrint {
-
-	//Pull this out into a separate function FIXME
-	frags := map[string]int{}
-	for _, f := range fragments {
-		if len(f) > 1 && len(f) < maxTagLength {
-
-			key, rawScore := calcRawScore(f)
-
-			frags[key] = rawScore
-
-		} else {
-			log.Println("Rejected tag as too short or too long:", f)
-		}
-	}
-	searchP := searchPrint{}
-	for k, v := range frags {
-		//fmt.Printf("k: %v, v: %v\n", k, v)
-		if v > 0 {
-			searchP.wanted = append(searchP.wanted, k)
-			//fmt.Printf("Storing k: %v in wanted\n", k)
-		} else {
-			//fmt.Printf("Storing k: %v in unwanted\n", k)
-			searchP.unwanted = append(searchP.unwanted, k)
-		}
-	}
-	return searchP
-}
-
 //Contact server with search string
-func search(searchTerm string, numResults int) []tagbrowser.ResultRecordTransmittable {
+func search(searchTerm string, numResults int) []ResultRecordTransmittable {
 	statuses["Status"] = "Searching"
 	if searchTerm == "" {
 		return linesTr
 	}
 
-	pr := makeSearchPrint(RegSplit(strings.ToLower(searchTerm), FragsRegex))
+	pr := MakeSearchPrint(RegSplit(strings.ToLower(searchTerm), SearchFragsRegex))
 
-	var out []tagbrowser.ResultRecordTransmittable
+	var out []ResultRecordTransmittable
 	for _, v := range linesTr {
-		s := score(pr, v)
+		s := Score(pr, v)
 		v.Score = fmt.Sprintf("%v", s)
 		if s > 0 {
 			out = append(out, v)
@@ -259,12 +114,12 @@ func refreshTerm() {
 		putStr(0, 0, debugStr)
 		putStr(0, 1, fmt.Sprintf("Search for:%v", searchStr))
 		_, height := termbox.Size()
-		//prevRecord := tagbrowser.ResultRecordTransmittable{"", -1, makeFingerprintFromData(""), "", 0}
-		prevRecord := tagbrowser.ResultRecordTransmittable{}
+		//prevRecord := ResultRecordTransmittable{"", -1, makeFingerprintFromData(""), "", 0}
+		prevRecord := ResultRecordTransmittable{}
 		dispLine := 2
 		if len(results) > 0 {
-			//putStr(5, dispLine, fmt.Sprintf("%v (line %v)", results[0].Filename, results[0].Line))
-			putStr(5, dispLine, results[0].Sample)
+			putStr(5, dispLine, fmt.Sprintf("%v (line %v)", results[0].Filename, results[0].Line))
+			//putStr(5, dispLine, results[0].Sample)
 			dispLine++
 			prevRecord = results[0]
 		}
@@ -531,17 +386,19 @@ func slurpSTDIN() []string {
 }
 func main() {
 	LineCache = map[string]string{}
-	flag.StringVar(&tagbrowser.ServerAddress, "server", tagbrowser.ServerAddress, fmt.Sprintf("Server IP and Port.  Default: %s", tagbrowser.ServerAddress))
-	flag.Parse()
+	//flag.StringVar(&tagbrowser.ServerAddress, "server", tagbrowser.ServerAddress, fmt.Sprintf("Server IP and Port.  Default: %s", tagbrowser.ServerAddress))
+	//flag.Parse()
 	//terms := flag.Args()
 	//if len(terms) < 1 {
 	//	fmt.Println("Use: query.exe  < --completeMatch >  search terms")
 	//}
+
+	searchDir := os.Args[1]
 	searchStr = ""
 
 	refreshMutex = sync.Mutex{}
 	predictResults = []string{}
-	results = []tagbrowser.ResultRecordTransmittable{}
+	results = []ResultRecordTransmittable{}
 	statuses = map[string]string{}
 
 	termbox.Init()
@@ -554,15 +411,24 @@ func main() {
 
 	go automaticdoInput()
 
-	statuses["Server"] = "Reading Input"
-	lines := slurpSTDIN()
-	linesTr = []tagbrowser.ResultRecordTransmittable{}
-	for _, l := range lines {
-		r := tagbrowser.ResultRecordTransmittable{"", "", makeFingerprintFromData(l), l, "0"}
-		linesTr = append(linesTr, r)
-	}
-	statuses["Lines"] = fmt.Sprintf("%v", len(linesTr))
-	statuses["Server"] = "Read Complete"
+	statuses["Input"] = "Reading"
+	//lines := slurpSTDIN()
+	linesTr = []ResultRecordTransmittable{}
+
+	filepath.Walk(searchDir, func(path string, f os.FileInfo, err error) error {
+
+		fileBytes, err := ioutil.ReadFile(path)
+
+		lines := strings.Split(string(fileBytes), "\n")
+
+		for lineNum, l := range lines {
+			r := ResultRecordTransmittable{path, fmt.Sprintf("%v", lineNum), MakeFingerprintFromData(l), l, "0"}
+			linesTr = append(linesTr, r)
+		}
+		//statuses["File"] = path
+		return nil
+	})
+	statuses["Input"] = "Complete"
 	results = search(searchStr, 50)
 	refreshTerm()
 	for {
