@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	//"log"
 	"regexp"
 	"sort"
 	"strings"
@@ -144,7 +144,7 @@ func MakeSearchPrint(fragments []string) SearchPrint {
 			frags[key] = rawScore
 
 		} else {
-			log.Println("Rejected tag as too short or too long:", f)
+			//log.Println("Rejected tag as too short or too long:", f)
 		}
 	}
 	searchP := SearchPrint{}
