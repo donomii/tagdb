@@ -100,7 +100,7 @@ func search(searchTerm string, numResults int) []tagbrowser.ResultRecordTransmit
 	}
 
 	if len(terms) > 0 && len(terms[0]) > 2 {
-		cmd := []string{"/bin/sh", "-c", "csearch -i -n " + terms[0] + " " + grepStr + " | head -" + fmt.Sprintf("%v", height)}
+		cmd := []string{"/bin/sh", "-c", "csearch -i -n " + terms[0] + " " + grepStr + " | head -" + fmt.Sprintf("%v", numResults)}
 
 		//log.Println(cmd)
 		res := goof.QC(cmd)
