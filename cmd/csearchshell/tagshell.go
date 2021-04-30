@@ -86,16 +86,21 @@ func search(searchTerm string, numResults int) []tagbrowser.ResultRecordTransmit
 	//log.Println("Searching for: ", searchTerm)
 
 	var out []tagbrowser.ResultRecordTransmittable
-	terms := strings.Split(searchTerm, " ") //FIXME
+	terms := strings.Split(searchTerm, " ")
 
 	grepStr := ""
 
 	for _, t := range terms {
-		grepStr = grepStr + " | grep -i " + t
+		if strings.HasSuffix(t, "-") {
+			tt := strings.TrimSuffix(t, "-")
+			grepStr = grepStr + " | grep -i -v " + tt
+		} else {
+			grepStr = grepStr + " | grep -i " + t
+		}
 	}
 
 	if len(terms) > 0 && len(terms[0]) > 2 {
-		cmd := []string{"/bin/sh", "-c", "csearch -i -n " + terms[0] + " " + grepStr + " | head -20"}
+		cmd := []string{"/bin/sh", "-c", "csearch -i -n " + terms[0] + " " + grepStr + " | head -" + fmt.Sprintf("%v", height)}
 
 		//log.Println(cmd)
 		res := goof.QC(cmd)
@@ -241,6 +246,7 @@ func doInput() {
 				//statuses["Input"] = fmt.Sprintf("%v", ev.Key) //"Processing"
 				//debugStr = fmt.Sprintf("key: %v, %v, %v", ev.Key, ev.Ch, ev)
 				switch ev.Key {
+				case termbox.KeyArrowLeft:
 				case termbox.KeyArrowRight:
 					line, _ := strconv.ParseInt(results[selection].Line, 10, 0)
 					if line < 0 {
@@ -248,6 +254,7 @@ func doInput() {
 					}
 					if isLinux() || isDarwin() {
 						termbox.Close()
+						goof.QCI([]string{"vim", "+" + fmt.Sprintf("%v", line), results[selection].Filename})
 						termbox.Init()
 						refreshTerm()
 					} else {
