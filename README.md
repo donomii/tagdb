@@ -13,10 +13,10 @@ Tagdb stores urls and tags, allowing you to index files, webpages, and anything 
 
 ### Build
 
-    go build cmd/tagshell/tagshell.go
-    go build cmd/tagquery/tagquery.go
-    go build cmd/tagserver/tagserver.go
-    go build cmd/tagloader/tagloader.go
+    go build -o release/tagshell cmd/tagshell/tagshell.go
+    go build -o release/tagquery cmd/tagquery/tagquery.go 
+    go build -o release/tagserver cmd/tagserver/tagserver.go
+    go build -o release/tagloader cmd/tagloader/tagloader.go
 
 ### Start
 
