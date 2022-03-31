@@ -63,13 +63,14 @@ func (m *Manor) scanFileDatabase(searchString string, maxResults int, exactMatch
 		if debug {
 			log.Printf("Searching Farm: %v", aFarm.location)
 		}
-		log.Printf("Searching Farm: %v", aFarm.location)
 		pending = pending + 1
 		go func(threadFarm *Farm) {
 			res := threadFarm.scanFileDatabase(searchString, maxResults, exactMatch)
 			resLock.Lock()
 			defer resLock.Unlock()
+			if debug {
 			log.Printf("Merging in resultset %v for farm %v", res, threadFarm.location)
+			}
 			for _, r := range res {
 					if ! IsIn(r, results) {
 						results = append(results, r)
