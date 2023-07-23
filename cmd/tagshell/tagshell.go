@@ -266,6 +266,8 @@ func doInput() {
 				//statuses["Input"] = fmt.Sprintf("%v", ev.Key) //"Processing"
 				//debugStr = fmt.Sprintf("key: %v, %v, %v", ev.Key, ev.Ch, ev)
 				switch ev.Key {
+				case termbox.KeyF1:
+					statuses["Input"] = "F1"
 				case termbox.KeyArrowRight:
 					line, _ := strconv.ParseInt(results[selection].Line, 10, 0)
 					if line < 0 {
