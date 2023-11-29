@@ -2,10 +2,12 @@
 package tagbrowser
 
 import (
-    "unsafe"
-    "github.com/cornelk/hashmap"
-    //"runtime/pprof"
-    //debugModule "runtime/debug"
+	"unsafe"
+
+	"github.com/cornelk/hashmap"
+
+	//"runtime/pprof"
+	//debugModule "runtime/debug"
 	"bytes"
 	"encoding/gob"
 	"fmt"
@@ -22,22 +24,21 @@ import (
 )
 
 func NewHash() *hashmap.HashMap {
-    return hashmap.New(1)
+	return hashmap.New(1)
 }
 
 func SetHash(h *hashmap.HashMap, key string, val int) {
-    h.Set(key, unsafe.Pointer(&val))
+	h.Set(key, unsafe.Pointer(&val))
 }
 
 func GetHash(h *hashmap.HashMap, key string) (unsafe.Pointer, bool) {
 	v, ok := h.GetStringKey(key)
 	if ok {
-		return v.(unsafe.Pointer),ok
+		return v.(unsafe.Pointer), ok
 	} else {
 		return nil, false
 	}
 }
-
 
 func (s *tagSilo) predictString(aStr string, maxResults int) []string {
 	//var searchRegex = regexp.MustCompile(fmt.Sprintf("^%v", aStr))
@@ -65,7 +66,7 @@ func (s *tagSilo) tagToRecordIDs(tagID int) []int {
 		s.count("tag_cache_miss")
 		//var ret []byte
 		s.count("sql_select")
-        return s.Store.GetRecordId(tagID)
+		return s.Store.GetRecordId(tagID)
 		/* I think this is a left over fromwhen we stored JSON and had to unpack it each time
 		err := s.dbHandle.QueryRow("select value from TagToRecordTable where id like ?", tagID).Scan(&ret)
 		if err != nil {
@@ -92,26 +93,26 @@ func (s *tagSilo) tagToRecordIDs(tagID int) []int {
 			}
 			return val
 		}
-        */
+		*/
 	}
 }
 
 func (s *tagSilo) LockMe() {
 	if debug {
-        //log.Println("Attempting lock in silo ", s.id)
-    }
-    //debugModule.PrintStack()
+		//log.Println("Attempting lock in silo ", s.id)
+	}
+	//debugModule.PrintStack()
 	s.writeMutex.Lock()
 	if debug {
-        //log.Println("Got lock in silo ", s.id)
-    }
+		//log.Println("Got lock in silo ", s.id)
+	}
 
 }
 func (s *tagSilo) UnlockMe() {
 	s.writeMutex.Unlock()
 	if debug {
-        //log.Println("Released lock in silo ", s.id)
-    }
+		//log.Println("Released lock in silo ", s.id)
+	}
 
 }
 func (s *tagSilo) SubmitRecord(r record) {
@@ -140,12 +141,12 @@ func (s *tagSilo) storeRecordWorker() {
 			s.InputRecordCh <- aRecord
 			s.LogChan["thread"] <- fmt.Sprintln("StoreRecordWorker exiting in silo ", s.id)
 		} else {
-            r := record{s.get_or_create_symbol(aRecord.Filename), aRecord.Line, s.makeFingerprint(aRecord.Fingerprint)}
-            s.LogChan["transport"] <- fmt.Sprintln("storeRecord writing to recordCh")
-            s.recordCh <- r
-            s.count("record_accepted_for_store")
-            s.LogChan["transport"] <- fmt.Sprintln("storeRecord waiting for input")
-        }
+			r := record{s.get_or_create_symbol(aRecord.Filename), aRecord.Line, s.makeFingerprint(aRecord.Fingerprint)}
+			s.LogChan["transport"] <- fmt.Sprintln("storeRecord writing to recordCh")
+			s.recordCh <- r
+			s.count("record_accepted_for_store")
+			s.LogChan["transport"] <- fmt.Sprintln("storeRecord waiting for input")
+		}
 	}
 }
 
@@ -156,16 +157,16 @@ func (s *tagSilo) storePermanentRecordWorker() {
 			//FIXME race condition against shutdown (monitorworker)
 			s.LogChan["file"] <- fmt.Sprintf("StorePermanentRecordWorker exiting in silo %v", s.id)
 		} else {
-            r := record{s.get_or_create_symbol(aRecord.Filename), aRecord.Line, s.makeFingerprint(aRecord.Fingerprint)}
-            if debug {
-                log.Println("storeRecord writing to recordCh")
-            }
-            s.recordCh <- r
-            s.count("record_accepted_for_store")
-            if debug {
-                log.Println("storeRecord waiting for input")
-            }
-        }
+			r := record{s.get_or_create_symbol(aRecord.Filename), aRecord.Line, s.makeFingerprint(aRecord.Fingerprint)}
+			if debug {
+				log.Println("storeRecord writing to recordCh")
+			}
+			s.recordCh <- r
+			s.count("record_accepted_for_store")
+			if debug {
+				log.Println("storeRecord waiting for input")
+			}
+		}
 	}
 }
 
@@ -185,27 +186,27 @@ func (s *tagSilo) storeMemRecordWorker() {
 		s.last_database_record = len(s.database) - 1
 
 		for _, v := range line_elem.Fingerprint {
-            //FIXME
+			//FIXME
 			//if !contains(s.tag2file[v], &line_elem) {
-                if debug {
-                    log.Printf("tag id: %v, tag2file len : %v, string table len : %v", v, len(s.tag2file), len(s.reverse_string_table))
-                }
-                s.tag2file[v] = append(s.tag2file[v], &s.database[s.last_database_record])
+			if debug {
+				log.Printf("tag id: %v, tag2file len : %v, string table len : %v", v, len(s.tag2file), len(s.reverse_string_table))
+			}
+			s.tag2file[v] = append(s.tag2file[v], &s.database[s.last_database_record])
 
-                if debug {
-                    log.Printf("Added record %v to tag %v (%v)", s.last_database_record, s.getString(v), v)
-                }
+			if debug {
+				log.Printf("Added record %v to tag %v (%v)", s.last_database_record, s.getString(v), v)
+			}
 
 			//}
 		}
-        s.counterMutex.Lock()
-        s.counters["records"] = s.last_database_record
-        s.counterMutex.Unlock()
-        if debug {
-            log.Printf("Total records: %v", s.last_database_record)
-        }
-        
-        s.count("record_inserted")
+		s.counterMutex.Lock()
+		s.counters["records"] = s.last_database_record
+		s.counterMutex.Unlock()
+		if debug {
+			log.Printf("Total records: %v", s.last_database_record)
+		}
+
+		s.count("record_inserted")
 		if debug {
 			log.Println("storeMemRecord waiting for input")
 		}
@@ -253,25 +254,23 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 	}
 	//FIXME this needs to search all silos?  Or do we just filter out dupes during the search consolidation phase?
 
-
 	//FIXME dupe checks are slowing inserts too much?
 	dupe := false
 	/*
-	res := s.scanFileDatabase(searchPrint{aRecord.Fingerprint, fingerPrint{}}, 2, true)
-    if len(res) > 0 {
-		for _, v := range res {
-			if v.filename == s.getString(aRecord.Filename) && v.line == aRecord.Line {
-				dupe = true
+			res := s.scanFileDatabase(searchPrint{aRecord.Fingerprint, fingerPrint{}}, 2, true)
+		    if len(res) > 0 {
+				for _, v := range res {
+					if v.filename == s.getString(aRecord.Filename) && v.line == aRecord.Line {
+						dupe = true
+					}
+				}
 			}
-		}
-	}
-    */
-
+	*/
 
 	if dupe {
 		s.count("duplicates_rejected")
 		log.Printf("Attempt to insert a duplicate record.  This is not an error.")
-        s.count("record_duplicate")
+		s.count("record_duplicate")
 	} else {
 		s.Dirty()
 		s.count("db_update")
@@ -283,9 +282,9 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 		defer s.UnlockMe()
 		//s.LogChan["transport"] <-fmt.Sprintln("Storing record with ", len(aRecord.Fingerprint), " tags")
 
-        s.Store.InsertRecord(s, key, aRecord)
-        s.Store.StoreTagToRecord(s.last_database_record, aRecord.Fingerprint)
-        s.count("record_inserted")
+		s.Store.InsertRecord(s, key, aRecord)
+		s.Store.StoreTagToRecord(s.last_database_record, aRecord.Fingerprint)
+		s.count("record_inserted")
 
 		if debug {
 			log.Println("storeFileRecord waiting for input")
@@ -295,21 +294,21 @@ func (s *tagSilo) storeFileRecord(aRecord record) {
 }
 
 func (s *tagSilo) storeFileRecordWorker() {
-    if debug {
-        log.Println("Starting File worker in silo ", s.id)
-    }
+	if debug {
+		log.Println("Starting File worker in silo ", s.id)
+	}
 
 	for aRecord := range s.recordCh {
-    if debug {
-        log.Println("Reading record to store", aRecord)
-    }
+		if debug {
+			log.Println("Reading record to store", aRecord)
+		}
 		if s.ReadOnly || !s.Operational {
-            if s.ReadOnly {
-                log.Println("Silo ", s.id, " is readonly")
-            } 
-            if !s.Operational {
-                log.Println("Silo ", s.id, " is not operational")
-            }
+			if s.ReadOnly {
+				log.Println("Silo ", s.id, " is readonly")
+			}
+			if !s.Operational {
+				log.Println("Silo ", s.id, " is not operational")
+			}
 			//FIXME race condition against shutdown (monitorworker)
 			log.Println("Punting the record back to the input channel in silo: ", s.id)
 			s.recordCh <- aRecord
@@ -317,8 +316,8 @@ func (s *tagSilo) storeFileRecordWorker() {
 			//log.Println("StoreFileRecordWorker exiting in silo ", s.id)
 			//return
 		} else {
-            s.storeFileRecord(aRecord)
-        }
+			s.storeFileRecord(aRecord)
+		}
 	}
 }
 
@@ -352,7 +351,7 @@ func (s *tagSilo) getDiskRecord(recordID int) record {
 		}
 		s.count("sql_select")
 
-        return s.Store.GetRecord(key)
+		return s.Store.GetRecord(key)
 	}
 }
 func (s *tagSilo) scanFileDatabase(aFing searchPrint, maxResults int, exactMatch bool) resultRecordCollection {
@@ -496,16 +495,16 @@ func (s *tagSilo) getString(index int) string {
 		}
 		return s.reverse_string_table[index]
 	} else {
-        s.LockMe()
-        defer s.UnlockMe()
+		s.LockMe()
+		defer s.UnlockMe()
 		if cache_val, ok := s.string_cache[index]; ok {
-		//if cache_val:="";false {
+			//if cache_val:="";false {
 			s.count("string_cache_hit")
 			return cache_val
 		} else {
-            str := s.Store.GetString(s, index)
-            return str
-        }
+			str := s.Store.GetString(s, index)
+			return str
+		}
 	}
 }
 
@@ -518,7 +517,7 @@ func (s *tagSilo) get_memdb_symbol(aStr string) (int, error) {
 		panic("Silo is nil")
 	}
 	//if s.dbHandle != nil {
-		//panic("dbhandle not nil for memdb!")
+	//panic("dbhandle not nil for memdb!")
 	//}
 
 	key := patricia.Prefix(aStr)
@@ -555,10 +554,10 @@ func (s *tagSilo) get_symbol(aStr string) (int, error) {
 	var retval int
 	var err error
 	//if val, ok := s.symbol_cache[aStr]; ok {
-	if val, ok := GetHash(s.symbol_cache,aStr); ok {
+	if val, ok := GetHash(s.symbol_cache, aStr); ok {
 		s.count("symbol_cache_hit")
-        var ret1 *int
-        ret1 =(*int)(val)
+		var ret1 *int
+		ret1 = (*int)(val)
 		return *ret1, nil
 	} else {
 		s.count("symbol_cache_miss")
@@ -570,7 +569,7 @@ func (s *tagSilo) get_symbol(aStr string) (int, error) {
 		}
 		if retval != 0 && err == nil {
 			//s.symbol_cache[aStr] = retval
-			SetHash(s.symbol_cache,aStr, retval)
+			SetHash(s.symbol_cache, aStr, retval)
 		}
 	}
 	return retval, err
@@ -616,8 +615,8 @@ func (s *tagSilo) get_diskdb_symbol(aStr string) (int, error) {
 		}
 
 	} else {
-        retval = s.Store.GetSymbol(s, aStr)
-    }
+		retval = s.Store.GetSymbol(s, aStr)
+	}
 	return retval, nil
 }
 
@@ -664,7 +663,7 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 			} else {
 				s.next_string_index = s.next_string_index + 1
 				if !s.memory_db {
-				    s.Store.InsertStringAndSymbol(s, aStr)
+					s.Store.InsertStringAndSymbol(s, aStr)
 				} else {
 					s.string_table.Insert(patricia.Prefix(aStr), s.next_string_index)
 					if s.next_string_index < len(s.reverse_string_table)-1 {
@@ -956,8 +955,8 @@ func (s *tagSilo) monitorSiloWorker() {
 			}
 		}
 		//if len(s.string_cache) > 10000 {
-			s.string_cache = map[int]string{}
-			s.count("string_cache_clear")
+		s.string_cache = map[int]string{}
+		s.count("string_cache_clear")
 		//}
 		/*if len(s.symbol_cache) > 10000 {
 			s.symbol_cache = map[string]int{}
@@ -967,13 +966,13 @@ func (s *tagSilo) monitorSiloWorker() {
 		s.count("symbol_cache_clear")
 
 		//if len(s.tag_cache) > 10000 {
-			s.tag_cache = map[int][]int{}
-			s.count("string_cache_clear")
+		s.tag_cache = map[int][]int{}
+		s.count("string_cache_clear")
 		//}
 
-        s.counterMutex.Lock()
-	log.Println("Silo: ", s.filename, " : ", s.id, s.counters)
-        s.counterMutex.Unlock()
+		s.counterMutex.Lock()
+		log.Println("Silo: ", s.filename, " : ", s.id, s.counters)
+		s.counterMutex.Unlock()
 
 	}
 }
@@ -997,7 +996,6 @@ func (s *tagSilo) Dirty() {
 	s.dirty = true
 	s.LockLog <- "Released dirty lock"
 }
-
 
 func (s *tagSilo) Checkpoint() {
 	s.LockLog <- "Locking checkpoint"
@@ -1029,17 +1027,16 @@ func (s *tagSilo) Checkpoint() {
 	f.Sync()
 	f.Close()
 
-
 	s.dirty = false
 	s.LockLog <- "Released checkpoint lock"
 }
 
 func (s *tagSilo) checkpointWorker() {
 	for {
-		time.Sleep(time.Second * 600.0)  //FIXME load time from config file
+		time.Sleep(time.Second * 600.0) //FIXME load time from config file
 		if s.dirty && s.Operational {
 			s.Checkpoint()
-            s.LogChan["file"] <- fmt.Sprintf("Checkpoint complete for silo %v", s.id)
+			s.LogChan["file"] <- fmt.Sprintf("Checkpoint complete for silo %v", s.id)
 		}
 		if !s.Operational {
 			return
@@ -1059,7 +1056,7 @@ func (s *tagSilo) SQLCommitWorker() {
 		if err != nil {
 			log.Fatal("Could not start transaction!")
 		}
-		time.Sleep(time.Second * 600.0)  //FIXME add to config file
+		time.Sleep(time.Second * 600.0) //FIXME add to config file
 
 		//s.transactionHandle.Commit()
 		s.transactionHandle = nil
@@ -1067,7 +1064,7 @@ func (s *tagSilo) SQLCommitWorker() {
 		if s.dirty && s.Operational {
 			//s.Checkpoint()
 			//s.LockMe()
-            s.Store.Flush(s)
+			s.Store.Flush(s)
 			//s.UnlockMe()
 
 			log.Println("SQL COMMIT complete ", s.filename)
@@ -1097,7 +1094,6 @@ type SerialiseMe struct {
 	Offloading    bool
 	MaxRecords    int
 }
-
 
 func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, inputChan chan RecordTransmittable, dataDir string, permanentStoreCh chan RecordTransmittable, isTemporary bool, maxRecords int, checkpointMutex sync.Mutex, logChans map[string]chan string) *tagSilo {
 
@@ -1142,10 +1138,10 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 		silo.anotherbuffer = &aBuff
 		checkpointname := fmt.Sprintf("%v.checkpoint", silo.filename)
 		f, ferr := os.Open(checkpointname)
-        if ferr != nil {
-            checkpointname := fmt.Sprintf("%v.checkpoint.bak", silo.filename)
-            f, ferr = os.Open(checkpointname)
-        }
+		if ferr != nil {
+			checkpointname := fmt.Sprintf("%v.checkpoint.bak", silo.filename)
+			f, ferr = os.Open(checkpointname)
+		}
 		if ferr == nil {
 			silo.LogChan["file"] <- fmt.Sprintln(checkpointname, " exists, reading stored data")
 			defer f.Close()
@@ -1169,7 +1165,7 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 				//s.temporary     = d.Temporary
 				silo.offload_index = d.Offload_index
 				//s.offloading    = d.Offloading
-                //silo.maxRecords = d.MaxRecords
+				//silo.maxRecords = d.MaxRecords
 
 				silo.dec = nil
 				silo.LogChan["file"] <- fmt.Sprintln("Recreating string table")
@@ -1186,16 +1182,17 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 
 		silo.LogChan["file"] <- fmt.Sprintf("Opening silo %v", silo.filename)
 
-		silo.Store = NewSQLStore(silo.filename)
-        silo.Store.Init(silo)
-        /*go func() {
-            for {
-                //pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
-                log.Println("Silo ", silo.id, " operational status: ", silo.Operational)
-                time.Sleep(5 * time.Second )
-             }
-        }()
-        */
+		//silo.Store = NewSQLStore(silo.filename)
+		silo.Store = NewWeaviateStore(silo.filename)
+		silo.Store.Init(silo)
+		/*go func() {
+		      for {
+		          //pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+		          log.Println("Silo ", silo.id, " operational status: ", silo.Operational)
+		          time.Sleep(5 * time.Second )
+		       }
+		  }()
+		*/
 
 		silo.LogChan["file"] <- fmt.Sprintf("Opened file %v", silo.filename)
 
@@ -1225,10 +1222,10 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 	go silo.monitorSiloWorker()
 
 	silo.LogChan["file"] <- fmt.Sprintln("Silo operational, ", len(silo.reverse_string_table), " entries,  ", silo.next_string_index, " strings, ", silo.last_tag_record, " tags")
-    if debug {
-        log.Println("Silo operational status: ", silo.Operational)
-        log.Println("Create silo finished")
-    }
+	if debug {
+		log.Println("Silo operational status: ", silo.Operational)
+		log.Println("Create silo finished")
+	}
 
 	return silo
 }
@@ -1304,4 +1301,3 @@ func (tSilo *tagSilo) test() {
 	//	}
 	//panic(fmt.Sprintf("%v", makeFingerprint("trie trie")))
 }
-

@@ -2,12 +2,13 @@
 package tagbrowser
 
 import (
-    "github.com/cornelk/hashmap"
 	"bytes"
 	"database/sql"
 	"database/sql/driver"
 	"encoding/gob"
 	"sync"
+
+	"github.com/cornelk/hashmap"
 
 	"github.com/tchap/go-patricia/patricia"
 )
@@ -89,14 +90,14 @@ type tagSilo struct {
 	ReadOnly             bool
 	string_cache         map[int]string
 	//symbol_cache         map[string]int
-	symbol_cache         *hashmap.HashMap
-	tag_cache            map[int][]int
-	record_cache         map[int]record
-	threadsWait          sync.WaitGroup
-	dirty                bool
-	LockLog              chan string
-	LogChan              map[string]chan string
-    Store                SiloStore
+	symbol_cache *hashmap.HashMap
+	tag_cache    map[int][]int
+	record_cache map[int]record
+	threadsWait  sync.WaitGroup
+	dirty        bool
+	LockLog      chan string
+	LogChan      map[string]chan string
+	Store        SiloStore
 }
 
 type tomlConfig struct {
@@ -158,20 +159,18 @@ type resultRecordCollection []resultRecord
 type ResultRecordTransmittableCollection []ResultRecordTransmittable
 
 type SiloStore interface {
-    Init(silo *tagSilo)
-    GetString(s *tagSilo, index int) string
-    GetSymbol(silo *tagSilo, aStr string) int
-    InsertRecord(silo *tagSilo, key []byte, aRecord record)
-    InsertStringAndSymbol(silo *tagSilo, aStr string)
-    Flush(silo *tagSilo)
-    GetRecordId(tagID int) []int
-    StoreRecordId(key, val []byte)
-    Dbh () *sql.DB
-    GetRecord(key []byte) record
-    StoreTagToRecord(recordId int, fp fingerPrint)
+	Init(silo *tagSilo)
+	GetString(s *tagSilo, index int) string
+	GetSymbol(silo *tagSilo, aStr string) int
+	InsertRecord(silo *tagSilo, key []byte, aRecord record)
+	InsertStringAndSymbol(silo *tagSilo, aStr string)
+	Flush(silo *tagSilo)
+	GetRecordId(tagID int) []int
+	StoreRecordId(key, val []byte)
+	GetRecord(key []byte) record
+	StoreTagToRecord(recordId int, fp fingerPrint)
 }
 
-
 type SqlStore struct {
-    Db *sql.DB
+	Db *sql.DB
 }
