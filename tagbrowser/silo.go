@@ -59,7 +59,7 @@ func (s *tagSilo) predictString(aStr string, maxResults int) []string {
 }
 
 func (s *tagSilo) tagToRecordIDs(tagID int) []int {
-	if cache_val, ok := s.tag_cache[tagID]; ok {
+	if cache_val, ok := s.tag_cache.Load(tagID); ok {
 		s.count("tag_cache_hit")
 		return cache_val
 	} else {
@@ -200,7 +200,7 @@ func (s *tagSilo) storeMemRecordWorker() {
 			//}
 		}
 		s.counterMutex.Lock()
-		s.counters["records"] = s.last_database_record
+		s.counters.Store("records", s.last_database_record)
 		s.counterMutex.Unlock()
 		if debug {
 			log.Printf("Total records: %v", s.last_database_record)
@@ -335,7 +335,7 @@ func (s *tagSilo) getMemRecord(recordID int) record {
 
 func (s *tagSilo) getDiskRecord(recordID int) record {
 	s.count("records_fetched")
-	if cache_val, ok := s.record_cache[recordID]; ok {
+	if cache_val, ok := s.record_cache.Load(recordID); ok {
 		s.count("record_cache_hit")
 		return cache_val
 	} else {
@@ -497,7 +497,7 @@ func (s *tagSilo) getString(index int) string {
 	} else {
 		s.LockMe()
 		defer s.UnlockMe()
-		if cache_val, ok := s.string_cache[index]; ok {
+		if cache_val, ok := s.string_cache.Load(index); ok {
 			//if cache_val:="";false {
 			s.count("string_cache_hit")
 			return cache_val
@@ -955,7 +955,7 @@ func (s *tagSilo) monitorSiloWorker() {
 			}
 		}
 		//if len(s.string_cache) > 10000 {
-		s.string_cache = map[int]string{}
+		s.string_cache = new(Map[int,string])
 		s.count("string_cache_clear")
 		//}
 		/*if len(s.symbol_cache) > 10000 {
@@ -966,7 +966,7 @@ func (s *tagSilo) monitorSiloWorker() {
 		s.count("symbol_cache_clear")
 
 		//if len(s.tag_cache) > 10000 {
-		s.tag_cache = map[int][]int{}
+		s.tag_cache = new(Map[int,[]int])
 		s.count("string_cache_clear")
 		//}
 
@@ -980,7 +980,8 @@ func (s *tagSilo) monitorSiloWorker() {
 func (s *tagSilo) count(name string) {
 	s.counterMutex.Lock()
 	defer s.counterMutex.Unlock()
-	s.counters[name] = s.counters[name] + 1
+	val,_ := s.counters.Load(name) 
+	s.counters.Store(name,val + 1)
 }
 
 func (s *tagSilo) heartBeat() {
@@ -1080,7 +1081,7 @@ type SerialiseMe struct {
 	Last_database_record int
 
 	Database          []record //The in memory database, if any
-	Counters          map[string]int
+	Counters          *Map[string,int]
 	Next_string_index int
 	Last_tag_record   int
 	//String_table      *patricia.Trie  //Does not serialise?
@@ -1115,12 +1116,12 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 	silo.last_database_record = 1
 	silo.offload_index = 2
 	silo.maxRecords = maxRecords
-	silo.string_cache = map[int]string{}
+	silo.string_cache = new(Map[int,string])
 	//silo.symbol_cache = map[string]int{}
 	silo.symbol_cache = NewHash()
-	silo.tag_cache = map[int][]int{}
-	silo.record_cache = map[int]record{}
-	silo.counters = map[string]int{}
+	silo.tag_cache = new(Map[int,[]int])
+	silo.record_cache = new(Map[int,record])
+	silo.counters = new(Map[string,int])
 	silo.threadsWait = sync.WaitGroup{}
 
 	//go silo.heartBeat()

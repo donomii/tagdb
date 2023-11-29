@@ -11,6 +11,8 @@ import (
 	"github.com/cornelk/hashmap"
 
 	"github.com/tchap/go-patricia/patricia"
+
+
 )
 
 var ServerAddress = "127.0.0.1:6781"
@@ -72,7 +74,7 @@ type tagSilo struct {
 	trieMutex            sync.Mutex
 	counterMutex         sync.Mutex
 	checkpointMutex      sync.Mutex
-	counters             map[string]int
+	counters             *Map[string,int]
 	next_string_index    int
 	last_tag_record      int
 	string_table         *patricia.Trie
@@ -88,11 +90,11 @@ type tagSilo struct {
 	maxRecords           int
 	Operational          bool
 	ReadOnly             bool
-	string_cache         map[int]string
+	string_cache         *Map[int,string]
 	//symbol_cache         map[string]int
 	symbol_cache *hashmap.HashMap
-	tag_cache    map[int][]int
-	record_cache map[int]record
+	tag_cache    *Map[int,[]int]
+	record_cache *Map[int,record]
 	threadsWait  sync.WaitGroup
 	dirty        bool
 	LockLog      chan string
@@ -174,3 +176,34 @@ type SiloStore interface {
 type SqlStore struct {
 	Db *sql.DB
 }
+
+
+
+
+type Map[K comparable, V any] struct {
+	m sync.Map
+}
+
+func (m *Map[K, V]) Delete(key K) { m.m.Delete(key) }
+func (m *Map[K, V]) Load(key K) (value V, ok bool) {
+	v, ok := m.m.Load(key)
+	if !ok {
+		return value, ok
+	}
+	return v.(V), ok
+}
+func (m *Map[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
+	v, loaded := m.m.LoadAndDelete(key)
+	if !loaded {
+		return value, loaded
+	}
+	return v.(V), loaded
+}
+func (m *Map[K, V]) LoadOrStore(key K, value V) (actual V, loaded bool) {
+	a, loaded := m.m.LoadOrStore(key, value)
+	return a.(V), loaded
+}
+func (m *Map[K, V]) Range(f func(key K, value V) bool) {
+	m.m.Range(func(key, value any) bool { return f(key.(K), value.(V)) })
+}
+func (m *Map[K, V]) Store(key K, value V) { m.m.Store(key, value) }

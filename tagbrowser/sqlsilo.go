@@ -133,7 +133,7 @@ func (store *SqlStore) GetString(s *tagSilo, index int) string {
 	}
 
 	if val != "" {
-		s.string_cache[index] = val
+		s.string_cache.Store(index, val)
 	}
 	return val
 }
@@ -180,7 +180,7 @@ func (s *SqlStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) {
 	}
 
 	silo.count("sql_insert")
-	silo.record_cache[silo.last_database_record] = aRecord
+	silo.record_cache.Store(silo.last_database_record, aRecord)
 	if debug {
 		log.Printf("Record %v inserted: %v", silo.last_database_record, val)
 	}
