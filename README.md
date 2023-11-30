@@ -5,9 +5,7 @@
 
 Tagdb is a text search engine that offers fast word completion, and real time searches.
 
-Unfortunately, the loading process is quite slow right now.
-
-Tagdb stores urls and tags, allowing you to index files, webpages, and anything else you can reasonably access via a url.  It can also store line numbers for a file, allowing you to jump straight to your search result.
+Tagdb is an external search engine (pure inverted index), that stores urls and tags, allowing you to index files, webpages, and anything else you can reference via a url.  It can also store line numbers for a file, allowing you to jump straight to your search result.
 
 ## Installation
 
@@ -74,7 +72,7 @@ By default, tagloader will treat the entire contents of the file as one "search 
 
 -everyLine will store every line in a text file separately, so search results can return multiple lines in the same file.  You can then jump to the correct line using programs like tagshell.
 
-Tagloader creates a record in the database using on the path to the file (based on the command line argument).  It does no further processing of the path, and won't even normalise it.  So if you give it a relative path, it will store relative paths, which will make it difficult to find the file again if you search for it while in another directory.
+Tagloader creates a record in the database using the path to the file (based on the command line argument).  It does no further processing of the path, and won't even normalise it.  So if you give it a relative path, it will store relative paths, which will make it difficult to find the file again if you search for it while in another directory.
 
 Relative paths are useful for things like indexing a webserver directory, so you can later build a full URL from the relative path and the server name.  Absolute paths are more useful if you plan to access the files from the command line or other programs.
 
@@ -106,7 +104,6 @@ Order the server to quit.  This will take several seconds or minutes, depending 
 
 Print some server statistics
 
-
 ### tagserver
 
 tagserver is the main database, which listens for JSON-RPC requests and servers answers
@@ -122,11 +119,11 @@ tagserver is the main database, which listens for JSON-RPC requests and servers 
 
 #### -config
 
-Read a different configuration file.  The default file is "tagdb.conf", in the current directory.
+Read a configuration file.  The default file is "tagdb.conf", in the current directory.
 
 #### -preAlloc
 
-If the database files run out of room, they must be extended and this takes some time.  Preallocating entries can speed up this process.
+If the database files run out of room, they must be extended and this takes some time.  Preallocating entries can speed up this process.  Only implemented for some storage methods.
 
 ### fetchbot
 

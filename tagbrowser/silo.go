@@ -850,7 +850,7 @@ func (s *tagSilo) makeFingerprint(fragments []string) fingerPrint {
 			}
 		} else {
 			if len(f) > maxTagLength {
-				s.LogChan["warning"] <- fmt.Sprintln("Rejecting tag as too long: ", f)
+				Debugln("Rejecting tag as too long: ", f)
 			}
 		}
 
@@ -971,7 +971,13 @@ func (s *tagSilo) monitorSiloWorker() {
 		//}
 
 		s.counterMutex.Lock()
-		log.Println("Silo: ", s.filename, " : ", s.id, s.counters)
+		log.Printf("Silo %v counters:", s.id)
+		//Neatly print out the counters
+		s.counters.Range( func(key string, value int) bool {
+			log.Printf("%v: %v", key, value)
+			return true
+		})
+
 		s.counterMutex.Unlock()
 
 	}

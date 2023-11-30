@@ -25,9 +25,7 @@ import (
 	"github.com/weaviate/weaviate/entities/cyclemanager"
 )
 
-func compactionSetStrategy(ctx context.Context, t *testing.T, opts []BucketOption,
-	expectedMinSize, expectedMaxSize int64,
-) {
+func compactionSetStrategy(ctx context.Context, t *testing.T, opts []BucketOption, expectedMinSize, expectedMaxSize int64) {
 	size := 100
 
 	type kv struct {

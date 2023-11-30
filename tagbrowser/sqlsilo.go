@@ -110,16 +110,15 @@ func (s *SqlStore) Init(silo *tagSilo) {
 
 	}
 	rows.Close()
-	if debug {
-		log.Println("Buckets created")
-		//We should store this properly
-		log.Println("Set next_sting_index to ", silo.next_string_index)
-	}
+
+	Debugln("Buckets created")
+	//We should store this properly
+	Debugln("Set next_sting_index to ", silo.next_string_index)
 
 	go silo.storeFileRecordWorker()
-	if debug {
-		log.Println("Initialised silo ", silo.id)
-	}
+
+	Debugln("Initialised silo ", silo.id)
+
 }
 
 func (store *SqlStore) GetString(s *tagSilo, index int) string {
@@ -149,14 +148,12 @@ func (s *SqlStore) GetSymbol(silo *tagSilo, aStr string) int {
 	if err == nil {
 		retval = int(res)
 	} else {
-		if debug {
-			log.Printf("Error retrieving symbol for '%v': %v", aStr, err)
-		}
+
+		Debugf("Error retrieving symbol for '%v': %v", aStr, err)
+
 		return 0 //Note that 0 is "no symbol"
 	}
-	if debug {
-		log.Printf("Retrieved symbol for '%v': %v", aStr, retval)
-	}
+	Debugf("Retrieved symbol for '%v': %v", aStr, retval)
 	return retval
 }
 
@@ -181,9 +178,9 @@ func (s *SqlStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) {
 
 	silo.count("sql_insert")
 	silo.record_cache.Store(silo.last_database_record, aRecord)
-	if debug {
-		log.Printf("Record %v inserted: %v", silo.last_database_record, val)
-	}
+
+	Debugf("Record %v inserted: %v", silo.last_database_record, string(val))
+
 }
 
 func (s *SqlStore) GetRecord(key []byte) record {
