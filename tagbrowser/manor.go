@@ -18,7 +18,7 @@ type Manor struct {
 	permanentStoreCh chan RecordTransmittable //Used to send records to disk databases only
 }
 
-func createManor(config tomlConfig) *Manor {
+func CreateManor(config tomlConfig) *Manor {
 	m := Manor{}
 	m.Farms = []*Farm{}
 	m.recordCh = make(chan RecordTransmittable, 100)

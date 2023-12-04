@@ -303,7 +303,7 @@ log.Println("Starting rpc server on ", ServerAddress)
 
 	//time.Sleep(5 * time.Second)
 	log.Println("Loaded config: ", config)
-	defaultManor = createManor(config)
+	defaultManor = CreateManor(config)
 	//silo = createSilo(false, preAllocSize, "1", 1000000)
 
 	//test()

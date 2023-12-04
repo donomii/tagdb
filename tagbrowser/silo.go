@@ -2,9 +2,6 @@
 package tagbrowser
 
 import (
-	"unsafe"
-
-	"github.com/cornelk/hashmap"
 
 	//"runtime/pprof"
 	//debugModule "runtime/debug"
@@ -22,23 +19,6 @@ import (
 
 	"github.com/tchap/go-patricia/patricia"
 )
-
-func NewHash() *hashmap.HashMap {
-	return hashmap.New(1)
-}
-
-func SetHash(h *hashmap.HashMap, key string, val int) {
-	h.Set(key, unsafe.Pointer(&val))
-}
-
-func GetHash(h *hashmap.HashMap, key string) (unsafe.Pointer, bool) {
-	v, ok := h.GetStringKey(key)
-	if ok {
-		return v.(unsafe.Pointer), ok
-	} else {
-		return nil, false
-	}
-}
 
 func (s *tagSilo) predictString(aStr string, maxResults int) []string {
 	//var searchRegex = regexp.MustCompile(fmt.Sprintf("^%v", aStr))
@@ -554,11 +534,9 @@ func (s *tagSilo) get_symbol(aStr string) (int, error) {
 	var retval int
 	var err error
 	//if val, ok := s.symbol_cache[aStr]; ok {
-	if val, ok := GetHash(s.symbol_cache, aStr); ok {
+	if val, ok := s.symbol_cache.Load(aStr); ok {
 		s.count("symbol_cache_hit")
-		var ret1 *int
-		ret1 = (*int)(val)
-		return *ret1, nil
+		return val, nil
 	} else {
 		s.count("symbol_cache_miss")
 		if s.memory_db {
@@ -569,7 +547,7 @@ func (s *tagSilo) get_symbol(aStr string) (int, error) {
 		}
 		if retval != 0 && err == nil {
 			//s.symbol_cache[aStr] = retval
-			SetHash(s.symbol_cache, aStr, retval)
+			s.symbol_cache.Store( aStr, retval)
 		}
 	}
 	return retval, err
@@ -626,11 +604,9 @@ func (s *tagSilo) get_or_create_symbol(aStr string) int {
 		time.Sleep(time.Millisecond * 100)
 	}
 	//if val, ok := s.symbol_cache[aStr]; ok {
-	if val, ok := GetHash(s.symbol_cache, aStr); ok {
+	if val, ok := s.symbol_cache.Load( aStr); ok {
 		s.count("get/create_symbol_cache_hit")
-		var ret1 *int
-		ret1 = (*int)(val)
-		return *ret1
+		return val
 	} else {
 		s.count("get/create_symbol_cache_miss")
 		if aStr == "" {
@@ -962,7 +938,7 @@ func (s *tagSilo) monitorSiloWorker() {
 			s.symbol_cache = map[string]int{}
 			s.count("symbol_cache_clear")
 		}*/
-		s.symbol_cache = NewHash()
+		s.symbol_cache = new(Map[string,int])
 		s.count("symbol_cache_clear")
 
 		//if len(s.tag_cache) > 10000 {
@@ -1124,7 +1100,7 @@ func createSilo(memory bool, preAllocSize int, id string, channel_buffer int, in
 	silo.maxRecords = maxRecords
 	silo.string_cache = new(Map[int,string])
 	//silo.symbol_cache = map[string]int{}
-	silo.symbol_cache = NewHash()
+	silo.symbol_cache = new(Map[string,int])
 	silo.tag_cache = new(Map[int,[]int])
 	silo.record_cache = new(Map[int,record])
 	silo.counters = new(Map[string,int])

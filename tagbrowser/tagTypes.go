@@ -8,17 +8,14 @@ import (
 	"encoding/gob"
 	"sync"
 
-	"github.com/cornelk/hashmap"
 
 	"github.com/tchap/go-patricia/patricia"
-
-
 )
 
 var ServerAddress = "127.0.0.1:6781"
 var RpcPath = "/rpc/json/"
 
-//RPC
+// RPC
 type Args struct {
 	A     string
 	Limit int
@@ -74,7 +71,7 @@ type tagSilo struct {
 	trieMutex            sync.Mutex
 	counterMutex         sync.Mutex
 	checkpointMutex      sync.Mutex
-	counters             *Map[string,int]
+	counters             *Map[string, int]
 	next_string_index    int
 	last_tag_record      int
 	string_table         *patricia.Trie
@@ -90,11 +87,11 @@ type tagSilo struct {
 	maxRecords           int
 	Operational          bool
 	ReadOnly             bool
-	string_cache         *Map[int,string]
+	string_cache         *Map[int, string]
 	//symbol_cache         map[string]int
-	symbol_cache *hashmap.HashMap
-	tag_cache    *Map[int,[]int]
-	record_cache *Map[int,record]
+	symbol_cache *Map[string, int]
+	tag_cache    *Map[int, []int]
+	record_cache *Map[int, record]
 	threadsWait  sync.WaitGroup
 	dirty        bool
 	LockLog      chan string
@@ -176,9 +173,6 @@ type SiloStore interface {
 type SqlStore struct {
 	Db *sql.DB
 }
-
-
-
 
 type Map[K comparable, V any] struct {
 	m sync.Map
