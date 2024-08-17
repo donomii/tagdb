@@ -49,6 +49,10 @@ func (b *ReplaceableBucket) Compact() {
 	b.weaviateBucket.disk.compactIfLevelsMatch(nil)
 }
 
+func (b *ReplaceableBucket) Flush() {
+	b.weaviateBucket.FlushMemtable()
+}
+
 // Get a value from the store.
 func (b *ReplaceableBucket) Get(key []byte) ([]byte, error) {
 	return b.weaviateBucket.Get(key)
@@ -105,6 +109,10 @@ func NewRoaringBucket(dir string) *RoaringBucket {
 func (b *RoaringBucket) Compact() {
 	b.weaviateBucket.flushAndSwitchIfThresholdsMet(nil)
 	b.weaviateBucket.disk.compactIfLevelsMatch(nil)
+}
+
+func (b *RoaringBucket) Flush() {
+	b.weaviateBucket.FlushMemtable()
 }
 
 // Get a roaring bitmap from the store.  You will then have to work with the roaring bitmap to get the values.
