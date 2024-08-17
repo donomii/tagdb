@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -15,6 +15,7 @@ import (
 	"path"
 	"testing"
 
+	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/weaviate/weaviate/entities/lsmkv"
@@ -24,7 +25,12 @@ import (
 // https://www.youtube.com/watch?v=OS8taasZl8k
 func Test_MemtableSecondaryKeyBug(t *testing.T) {
 	dir := t.TempDir()
-	m, err := newMemtable(path.Join(dir, "will-never-flush"), StrategyReplace, 1, nil)
+
+	logger, _ := test.NewNullLogger()
+	cl, err := newCommitLogger(dir)
+	require.NoError(t, err)
+
+	m, err := newMemtable(path.Join(dir, "will-never-flush"), StrategyReplace, 1, cl, nil, logger)
 	require.Nil(t, err)
 	t.Cleanup(func() {
 		require.Nil(t, m.commitlog.close())

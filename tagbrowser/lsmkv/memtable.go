@@ -1,11 +1,25 @@
+//                           _       _
+// __      _____  __ ___   ___  __ _| |_ ___
+// \ \ /\ / / _ \/ _` \ \ / / |/ _` | __/ _ \
+//  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
+//   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
+//
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
+//
+//  CONTACT: hello@weaviate.io
+//
+
 package lsmkv
 
 import (
+
 	"sync"
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/roaringset"
+	"github.com/sirupsen/logrus"
+	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
+	"github.com/weaviate/weaviate/adapters/repos/db/roaringsetrange"
 	"github.com/weaviate/weaviate/entities/lsmkv"
 )
 
@@ -16,35 +30,33 @@ type Memtable struct {
 	keyMap             *binarySearchTreeMap
 	primaryIndex       *binarySearchTree
 	roaringSet         *roaringset.BinarySearchTree
+	roaringSetRange    *roaringsetrange.Memtable
 	commitlog          *commitLogger
 	size               uint64
 	path               string
 	strategy           string
 	secondaryIndices   uint16
 	secondaryToPrimary []map[string][]byte
-	lastWrite          time.Time
-	createdAt          time.Time
+	// stores time memtable got dirty to determine when flush is needed
+	dirtyAt   time.Time
+	createdAt time.Time
 }
 
-func newMemtable(path string, strategy string,
-	secondaryIndices uint16,
+func newMemtable(path string, strategy string, secondaryIndices uint16,
+	cl *commitLogger,  logger logrus.FieldLogger,
 ) (*Memtable, error) {
-	cl, err := newCommitLogger(path)
-	if err != nil {
-		return nil, errors.Wrap(err, "init commit logger")
-	}
-
 	m := &Memtable{
 		key:              &binarySearchTree{},
 		keyMulti:         &binarySearchTreeMulti{},
 		keyMap:           &binarySearchTreeMap{},
 		primaryIndex:     &binarySearchTree{}, // todo, sort upfront
 		roaringSet:       &roaringset.BinarySearchTree{},
+		roaringSetRange:  roaringsetrange.NewMemtable(logger),
 		commitlog:        cl,
 		path:             path,
 		strategy:         strategy,
 		secondaryIndices: secondaryIndices,
-		lastWrite:        time.Now(),
+		dirtyAt:          time.Time{},
 		createdAt:        time.Now(),
 	}
 
@@ -55,10 +67,13 @@ func newMemtable(path string, strategy string,
 		}
 	}
 
+
 	return m, nil
 }
 
 func (m *Memtable) get(key []byte) ([]byte, error) {
+
+
 	if m.strategy != StrategyReplace {
 		return nil, errors.Errorf("get only possible with strategy 'replace'")
 	}
@@ -75,6 +90,8 @@ func (m *Memtable) get(key []byte) ([]byte, error) {
 }
 
 func (m *Memtable) getBySecondary(pos int, key []byte) ([]byte, error) {
+
+
 	if m.strategy != StrategyReplace {
 		return nil, errors.Errorf("get only possible with strategy 'replace'")
 	}
@@ -96,8 +113,9 @@ func (m *Memtable) getBySecondary(pos int, key []byte) ([]byte, error) {
 }
 
 func (m *Memtable) put(key, value []byte, opts ...SecondaryKeyOption) error {
+
+
 	if m.strategy != StrategyReplace {
-		panic("put only possible with strategy 'replace'")
 		return errors.Errorf("put only possible with strategy 'replace'")
 	}
 
@@ -125,7 +143,6 @@ func (m *Memtable) put(key, value []byte, opts ...SecondaryKeyOption) error {
 	}
 
 	netAdditions, previousKeys := m.key.insert(key, value, secondaryKeys)
-	m.size += uint64(netAdditions)
 
 	for i, sec := range previousKeys {
 		m.secondaryToPrimary[i][string(sec)] = nil
@@ -135,12 +152,15 @@ func (m *Memtable) put(key, value []byte, opts ...SecondaryKeyOption) error {
 		m.secondaryToPrimary[i][string(sec)] = key
 	}
 
-	m.lastWrite = time.Now()
+	m.size += uint64(netAdditions)
+	m.updateDirtyAt()
 
 	return nil
 }
 
 func (m *Memtable) setTombstone(key []byte, opts ...SecondaryKeyOption) error {
+
+
 	if m.strategy != "replace" {
 		return errors.Errorf("setTombstone only possible with strategy 'replace'")
 	}
@@ -170,12 +190,15 @@ func (m *Memtable) setTombstone(key []byte, opts ...SecondaryKeyOption) error {
 
 	m.key.setTombstone(key, secondaryKeys)
 	m.size += uint64(len(key)) + 1 // 1 byte for tombstone
-	m.lastWrite = time.Now()
+
+	m.updateDirtyAt()
 
 	return nil
 }
 
 func (m *Memtable) getCollection(key []byte) ([]value, error) {
+
+
 	if m.strategy != StrategySetCollection && m.strategy != StrategyMapCollection {
 		return nil, errors.Errorf("getCollection only possible with strategies %q, %q",
 			StrategySetCollection, StrategyMapCollection)
@@ -193,6 +216,8 @@ func (m *Memtable) getCollection(key []byte) ([]value, error) {
 }
 
 func (m *Memtable) getMap(key []byte) ([]MapPair, error) {
+
+
 	if m.strategy != StrategyMapCollection {
 		return nil, errors.Errorf("getCollection only possible with strategy %q",
 			StrategyMapCollection)
@@ -210,6 +235,8 @@ func (m *Memtable) getMap(key []byte) ([]MapPair, error) {
 }
 
 func (m *Memtable) append(key []byte, values []value) error {
+
+
 	if m.strategy != StrategySetCollection && m.strategy != StrategyMapCollection {
 		return errors.Errorf("append only possible with strategies %q, %q",
 			StrategySetCollection, StrategyMapCollection)
@@ -230,11 +257,14 @@ func (m *Memtable) append(key []byte, values []value) error {
 		m.size += uint64(len(value.value))
 	}
 
-	m.lastWrite = time.Now()
+	m.updateDirtyAt()
+
 	return nil
 }
 
 func (m *Memtable) appendMapSorted(key []byte, pair MapPair) error {
+
+
 	if m.strategy != StrategyMapCollection {
 		return errors.Errorf("append only possible with strategy %q",
 			StrategyMapCollection)
@@ -252,7 +282,8 @@ func (m *Memtable) appendMapSorted(key []byte, pair MapPair) error {
 		primaryKey: key,
 		values: []value{
 			{
-				value: valuesForCommitLog,
+				value:     valuesForCommitLog,
+				tombstone: pair.Tombstone,
 			},
 		},
 	}); err != nil {
@@ -260,9 +291,9 @@ func (m *Memtable) appendMapSorted(key []byte, pair MapPair) error {
 	}
 
 	m.keyMap.insert(key, pair)
-
 	m.size += uint64(len(key) + len(valuesForCommitLog))
-	m.lastWrite = time.Now()
+
+	m.updateDirtyAt()
 
 	return nil
 }
@@ -281,11 +312,22 @@ func (m *Memtable) ActiveDuration() time.Duration {
 	return time.Since(m.createdAt)
 }
 
-func (m *Memtable) IdleDuration() time.Duration {
+func (m *Memtable) updateDirtyAt() {
+	if m.dirtyAt.IsZero() {
+		m.dirtyAt = time.Now()
+	}
+}
+
+// returns time memtable got dirty (1st write occurred)
+// (0 if clean)
+func (m *Memtable) DirtyDuration() time.Duration {
 	m.RLock()
 	defer m.RUnlock()
 
-	return time.Since(m.lastWrite)
+	if m.dirtyAt.IsZero() {
+		return 0
+	}
+	return time.Since(m.dirtyAt)
 }
 
 func (m *Memtable) countStats() *countStats {
@@ -294,6 +336,12 @@ func (m *Memtable) countStats() *countStats {
 	return m.key.countStats()
 }
 
+// the WAL uses a buffer and isn't written until the buffer size is crossed or
+// this function explicitly called. This allows to safge unnecessary disk
+// writes in larger operations, such as batches. It is sufficient to call write
+// on the WAL just once. This does not make a batch atomic, but it guarantees
+// that the WAL is written before a successful response is returned to the
+// user.
 func (m *Memtable) writeWAL() error {
 	m.Lock()
 	defer m.Unlock()

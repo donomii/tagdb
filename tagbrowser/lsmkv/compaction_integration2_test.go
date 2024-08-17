@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -133,7 +133,7 @@ func TestCompactionReplaceStrategyStraggler(t *testing.T) {
 	})
 
 	t.Run("init bucket", func(t *testing.T) {
-		b, err := NewBucket(context.TODO(), dirName, "", nullLogger2(), nil,
+		b, err := NewBucketCreator().NewBucket(context.TODO(), dirName, "", nullLogger2(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 

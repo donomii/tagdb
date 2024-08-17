@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -19,84 +19,85 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sort"
+	"testing"
 
-		"sort"
-		"testing"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/weaviate/weaviate/entities/cyclemanager"
+)
 
-		"github.com/stretchr/testify/assert"
-		"github.com/stretchr/testify/require"
-		"github.com/weaviate/weaviate/entities/cyclemanager"
-	)
+func compactionMapStrategy(ctx context.Context, t *testing.T, opts []BucketOption,
+	expectedMinSize, expectedMaxSize int64,
+) {
+	size := 100
 
-	func compactionMapStrategy(ctx context.Context, t *testing.T, opts []BucketOption, expectedMinSize, expectedMaxSize int64) {
-		size := 100
+	type kv struct {
+		key    []byte
+		values []MapPair
+	}
 
-		type kv struct {
-			key    []byte
-			values []MapPair
-		}
+	// this segment is not part of the merge, but might still play a role in
+	// overall results. For example if one of the later segments has a tombstone
+	// for it
+	var previous1 []kv
+	var previous2 []kv
 
-		// this segment is not part of the merge, but might still play a role in
-		// overall results. For example if one of the later segments has a tombstone
-		// for it
-		var previous1 []kv
-		var previous2 []kv
+	var segment1 []kv
+	var segment2 []kv
+	var expected []kv
+	var bucket *Bucket
 
-		var segment1 []kv
-		var segment2 []kv
-		var expected []kv
-		var bucket *Bucket
+	dirName := t.TempDir()
 
-		dirName := t.TempDir()
+	t.Run("create test data", func(t *testing.T) {
+		// The test data is split into 4 scenarios evenly:
+		//
+		// 0.) created in the first segment, never touched again
+		// 1.) created in the first segment, appended to it in the second
+		// 2.) created in the first segment, first element updated in the second
+		// 3.) created in the first segment, second element updated in the second
+		// 4.) created in the first segment, first element deleted in the second
+		// 5.) created in the first segment, second element deleted in the second
+		// 6.) not present in the first segment, created in the second
+		// 7.) present in an unrelated previous segment, deleted in the first
+		// 8.) present in an unrelated previous segment, deleted in the second
+		// 9.) present in an unrelated previous segment, never touched again
+		for i := 0; i < size; i++ {
+			rowKey := []byte(fmt.Sprintf("row-%03d", i))
 
-		t.Run("create test data", func(t *testing.T) {
-			// The test data is split into 4 scenarios evenly:
-			//
-			// 0.) created in the first segment, never touched again
-			// 1.) created in the first segment, appended to it in the second
-			// 2.) created in the first segment, first element updated in the second
-			// 3.) created in the first segment, second element updated in the second
-			// 4.) created in the first segment, first element deleted in the second
-			// 5.) created in the first segment, second element deleted in the second
-			// 6.) not present in the first segment, created in the second
-			// 7.) present in an unrelated previous segment, deleted in the first
-			// 8.) present in an unrelated previous segment, deleted in the second
-			// 9.) present in an unrelated previous segment, never touched again
-			for i := 0; i < size; i++ {
-				rowKey := []byte(fmt.Sprintf("row-%03d", i))
+			pair1 := MapPair{
+				Key:   []byte(fmt.Sprintf("value-%03d-01", i)),
+				Value: []byte(fmt.Sprintf("value-%03d-01-original", i)),
+			}
+			pair2 := MapPair{
+				Key:   []byte(fmt.Sprintf("value-%03d-02", i)),
+				Value: []byte(fmt.Sprintf("value-%03d-02-original", i)),
+			}
+			pairs := []MapPair{pair1, pair2}
 
-				pair1 := MapPair{
-					Key:   []byte(fmt.Sprintf("value-%03d-01", i)),
-					Value: []byte(fmt.Sprintf("value-%03d-01-original", i)),
-				}
-				pair2 := MapPair{
-					Key:   []byte(fmt.Sprintf("value-%03d-02", i)),
-					Value: []byte(fmt.Sprintf("value-%03d-02-original", i)),
-				}
-				pairs := []MapPair{pair1, pair2}
+			switch i % 10 {
+			case 0:
+				// add to segment 1
+				segment1 = append(segment1, kv{
+					key:    rowKey,
+					values: pairs[:1],
+				})
 
-				switch i % 10 {
-				case 0:
-					// add to segment 1
-					segment1 = append(segment1, kv{
-						key:    rowKey,
-						values: pairs[:1],
-					})
+				// leave this element untouched in the second segment
+				expected = append(expected, kv{
+					key:    rowKey,
+					values: pairs[:1],
+				})
+			case 1:
+				// add to segment 1
+				segment1 = append(segment1, kv{
+					key:    rowKey,
+					values: pairs[:1],
+				})
 
-					// leave this element untouched in the second segment
-					expected = append(expected, kv{
-						key:    rowKey,
-						values: pairs[:1],
-					})
-				case 1:
-					// add to segment 1
-					segment1 = append(segment1, kv{
-						key:    rowKey,
-						values: pairs[:1],
-					})
-
-					// add extra pair in the second segment
-					segment2 = append(segment2, kv{
+				// add extra pair in the second segment
+				segment2 = append(segment2, kv{
 					key:    rowKey,
 					values: pairs[1:2],
 				})
@@ -297,7 +298,7 @@ import (
 	})
 
 	t.Run("init bucket", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, dirName, nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, dirName, nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -367,7 +368,7 @@ import (
 		c := bucket.MapCursor()
 		defer c.Close()
 
-		for k, v := c.First(); k != nil; k, v = c.Next() {
+		for k, v := c.First(ctx); k != nil; k, v = c.Next(ctx) {
 			retrieved = append(retrieved, kv{
 				key:    k,
 				values: v,
@@ -399,7 +400,7 @@ import (
 		c := bucket.MapCursor()
 		defer c.Close()
 
-		for k, v := c.First(); k != nil; k, v = c.Next() {
+		for k, v := c.First(ctx); k != nil; k, v = c.Next(ctx) {
 			retrieved = append(retrieved, kv{
 				key:    k,
 				values: v,
@@ -418,7 +419,7 @@ import (
 			// _individual_ keys. Corrupting this index is exactly what happened in
 			// https://github.com/weaviate/weaviate/issues/3517
 			for _, pair := range expected {
-				retrieved, err := bucket.MapList(pair.key)
+				retrieved, err := bucket.MapList(ctx, pair.key)
 				require.NoError(t, err)
 
 				assert.Equal(t, pair.values, retrieved)
@@ -444,7 +445,7 @@ func compactionMapStrategy_RemoveUnnecessary(ctx context.Context, t *testing.T, 
 	dirName := t.TempDir()
 
 	t.Run("init bucket", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, dirName, nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, dirName, nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -510,7 +511,7 @@ func compactionMapStrategy_RemoveUnnecessary(ctx context.Context, t *testing.T, 
 		c := bucket.MapCursor()
 		defer c.Close()
 
-		for k, v := c.First(); k != nil; k, v = c.Next() {
+		for k, v := c.First(ctx); k != nil; k, v = c.Next(ctx) {
 			retrieved = append(retrieved, kv{
 				key:    k,
 				values: v,
@@ -534,7 +535,7 @@ func compactionMapStrategy_RemoveUnnecessary(ctx context.Context, t *testing.T, 
 		c := bucket.MapCursor()
 		defer c.Close()
 
-		for k, v := c.First(); k != nil; k, v = c.Next() {
+		for k, v := c.First(ctx); k != nil; k, v = c.Next(ctx) {
 			retrieved = append(retrieved, kv{
 				key:    k,
 				values: v,
@@ -552,7 +553,7 @@ func compactionMapStrategy_RemoveUnnecessary(ctx context.Context, t *testing.T, 
 			// _individual_ keys. Corrupting this index is exactly what happened in
 			// https://github.com/weaviate/weaviate/issues/3517
 			for _, pair := range expected {
-				retrieved, err := bucket.MapList(pair.key)
+				retrieved, err := bucket.MapList(ctx, pair.key)
 				require.NoError(t, err)
 
 				assert.Equal(t, pair.values, retrieved)
@@ -573,7 +574,7 @@ func compactionMapStrategy_FrequentPutDeleteOperations(ctx context.Context, t *t
 			dirName := t.TempDir()
 
 			t.Run("init bucket", func(t *testing.T) {
-				b, err := NewBucket(ctx, dirName, dirName, nullLogger(), nil,
+				b, err := NewBucketCreator().NewBucket(ctx, dirName, dirName, nullLogger(), nil,
 					cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 				require.Nil(t, err)
 
@@ -606,7 +607,7 @@ func compactionMapStrategy_FrequentPutDeleteOperations(ctx context.Context, t *t
 			})
 
 			t.Run("check entries before compaction", func(t *testing.T) {
-				res, err := bucket.MapList(key)
+				res, err := bucket.MapList(ctx, key)
 				assert.Nil(t, err)
 				if size == 5 || size == 6 {
 					assert.Empty(t, res)
@@ -625,7 +626,7 @@ func compactionMapStrategy_FrequentPutDeleteOperations(ctx context.Context, t *t
 			})
 
 			t.Run("check entries after compaction", func(t *testing.T) {
-				res, err := bucket.MapList(key)
+				res, err := bucket.MapList(ctx, key)
 				assert.Nil(t, err)
 				if size == 5 || size == 6 {
 					assert.Empty(t, res)

@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -13,6 +13,7 @@ package lsmkv
 
 import (
 	"bytes"
+	"context"
 
 	"github.com/pkg/errors"
 )
@@ -27,13 +28,17 @@ func newSortedMapMerger() *sortedMapMerger {
 	return &sortedMapMerger{}
 }
 
-func (s *sortedMapMerger) do(segments [][]MapPair) ([]MapPair, error) {
+func (s *sortedMapMerger) do(ctx context.Context, segments [][]MapPair) ([]MapPair, error) {
 	if err := s.init(segments); err != nil {
 		return nil, errors.Wrap(err, "init sorted map decoder")
 	}
 
 	i := 0
 	for {
+		if i%100 == 0 && ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
 		match, ok := s.findSegmentWithLowestKey()
 		if !ok {
 			break

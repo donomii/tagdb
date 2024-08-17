@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -16,9 +16,14 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/roaringset"
+	"github.com/pkg/errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sirupsen/logrus"
 	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/segmentindex"
+	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
+	"github.com/weaviate/weaviate/adapters/repos/db/roaringsetrange"
 	"github.com/weaviate/weaviate/entities/cyclemanager"
 )
 
@@ -26,14 +31,20 @@ func (sg *SegmentGroup) bestCompactionCandidatePair() []int {
 	sg.maintenanceLock.RLock()
 	defer sg.maintenanceLock.RUnlock()
 
+	// if true, the parent shard has indicated that it has
+	// entered an immutable state. During this time, the
+	// SegmentGroup should refrain from flushing until its
+	// shard indicates otherwise
 	if sg.isReadyOnly() {
 		return nil
 	}
 
+	// Nothing to compact
 	if len(sg.segments) < 2 {
 		return nil
 	}
 
+	// first determine the lowest level with candidates
 	levels := map[uint16]int{}
 	lowestPairLevel := uint16(math.MaxUint16)
 	lowestLevel := uint16(math.MaxUint16)
@@ -59,6 +70,7 @@ func (sg *SegmentGroup) bestCompactionCandidatePair() []int {
 	}
 
 	if pairExists {
+		// now pick any two segments which match the level
 		var res []int
 
 		for i, segment := range sg.segments {
@@ -74,13 +86,19 @@ func (sg *SegmentGroup) bestCompactionCandidatePair() []int {
 		return res
 	} else {
 		if sg.compactLeftOverSegments {
+			// Some segments exist, but none are of the same level
+			// Merge the two lowest segments
+
 			return []int{secondLowestIndex, lowestIndex}
 		} else {
+			// No segments of the same level exist, and we are not allowed to merge the lowest segments
+			// This means we cannot compact.  Set COMPACT_LEFTOVER_SEGMENTS to true to compact the remaining segments
 			return nil
 		}
 	}
 }
 
+// segmentAtPos retrieves the segment for the given position using a read-lock
 func (sg *SegmentGroup) segmentAtPos(pos int) *segment {
 	sg.maintenanceLock.RLock()
 	defer sg.maintenanceLock.RUnlock()
@@ -88,90 +106,209 @@ func (sg *SegmentGroup) segmentAtPos(pos int) *segment {
 	return sg.segments[pos]
 }
 
+func segmentID(path string) string {
+	filename := filepath.Base(path)
+	return strings.TrimSuffix(strings.TrimPrefix(filename, "segment-"), ".db")
+}
+
 func (sg *SegmentGroup) compactOnce() (bool, error) {
+	// Is it safe to only occasionally lock instead of the entire duration? Yes,
+	// because other than compaction the only change to the segments array could
+	// be an append because of a new flush cycle, so we do not need to guarantee
+	// that the array contents stay stable over the duration of an entire
+	// compaction. We do however need to protect against a read-while-write (race
+	// condition) on the array. Thus any read from sg.segments need to protected
 	pair := sg.bestCompactionCandidatePair()
 	if pair == nil {
+		// nothing to do
 		return false, nil
 	}
 
-	path := fmt.Sprintf("%s.tmp", sg.segmentAtPos(pair[1]).path)
+	if sg.allocChecker != nil {
+		// allocChecker is optional
+		if err := sg.allocChecker.CheckAlloc(100 * 1024 * 1024); err != nil {
+			// if we don't have at least 100MB to spare, don't start a compaction. A
+			// compaction does not actually need a 100MB, but it will create garbage
+			// that needs to be cleaned up. If we're so close to the memory limit, we
+			// can increase stability by preventing anything that's not strictly
+			// necessary. Compactions can simply resume when the cluster has been
+			// scaled.
+			sg.logger.WithFields(logrus.Fields{
+				"action": "lsm_compaction",
+				"event":  "compaction_skipped_oom",
+				"path":   sg.dir,
+			}).WithError(err).
+				Warnf("skipping compaction due to memory pressure")
+
+			return false, nil
+		}
+	}
+
+	leftSegment := sg.segmentAtPos(pair[0])
+	rightSegment := sg.segmentAtPos(pair[1])
+
+	if !sg.compactionFitsSizeLimit(leftSegment, rightSegment) {
+		// nothing to do this round, let's wait for the next round in the hopes
+		// that we'll find smaller (lower-level) segments that can still fit.
+		return false, nil
+	}
+
+	path := filepath.Join(sg.dir, "segment-"+segmentID(leftSegment.path)+"_"+segmentID(rightSegment.path)+".db.tmp")
+
 	f, err := os.Create(path)
 	if err != nil {
 		return false, err
 	}
 
-	scratchSpacePath := sg.segmentAtPos(pair[1]).path + "compaction.scratch.d"
+	scratchSpacePath := rightSegment.path + "compaction.scratch.d"
 
-	level := sg.segmentAtPos(pair[0]).level
-	secondaryIndices := sg.segmentAtPos(pair[0]).secondaryIndexCount
+	// the assumption is that the first element is older, and/or a higher level
+	level := leftSegment.level
+	secondaryIndices := leftSegment.secondaryIndexCount
 
-	if level == sg.segmentAtPos(pair[1]).level {
+	if level == rightSegment.level {
 		level = level + 1
 	}
 
-	strategy := sg.segmentAtPos(pair[0]).strategy
+	strategy := leftSegment.strategy
 	cleanupTombstones := !sg.keepTombstones && pair[0] == 0
 
+	pathLabel := "n/a"
+	if sg.metrics != nil && !sg.metrics.groupClasses {
+		pathLabel = sg.dir
+	}
 	switch strategy {
+
+	// TODO: call metrics just once with variable strategy label
+
 	case segmentindex.StrategyReplace:
-		c := newCompactorReplace(f, sg.segmentAtPos(pair[0]).newCursor(),
-			sg.segmentAtPos(pair[1]).newCursor(), level, secondaryIndices, scratchSpacePath, cleanupTombstones)
+		c := newCompactorReplace(f, leftSegment.newCursor(),
+			rightSegment.newCursor(), level, secondaryIndices, scratchSpacePath, cleanupTombstones)
+
+		if sg.metrics != nil {
+			sg.metrics.CompactionReplace.With(prometheus.Labels{"path": pathLabel}).Inc()
+			defer sg.metrics.CompactionReplace.With(prometheus.Labels{"path": pathLabel}).Dec()
+		}
 
 		if err := c.do(); err != nil {
 			return false, err
 		}
 	case segmentindex.StrategySetCollection:
-		c := newCompactorSetCollection(f, sg.segmentAtPos(pair[0]).newCollectionCursor(),
-			sg.segmentAtPos(pair[1]).newCollectionCursor(), level, secondaryIndices,
+		c := newCompactorSetCollection(f, leftSegment.newCollectionCursor(),
+			rightSegment.newCollectionCursor(), level, secondaryIndices,
 			scratchSpacePath, cleanupTombstones)
+
+		if sg.metrics != nil {
+			sg.metrics.CompactionSet.With(prometheus.Labels{"path": pathLabel}).Inc()
+			defer sg.metrics.CompactionSet.With(prometheus.Labels{"path": pathLabel}).Dec()
+		}
 
 		if err := c.do(); err != nil {
 			return false, err
 		}
 	case segmentindex.StrategyMapCollection:
 		c := newCompactorMapCollection(f,
-			sg.segmentAtPos(pair[0]).newCollectionCursorReusable(),
-			sg.segmentAtPos(pair[1]).newCollectionCursorReusable(),
+			leftSegment.newCollectionCursorReusable(),
+			rightSegment.newCollectionCursorReusable(),
 			level, secondaryIndices, scratchSpacePath, sg.mapRequiresSorting, cleanupTombstones)
+
+		if sg.metrics != nil {
+			sg.metrics.CompactionMap.With(prometheus.Labels{"path": pathLabel}).Inc()
+			defer sg.metrics.CompactionMap.With(prometheus.Labels{"path": pathLabel}).Dec()
+		}
 
 		if err := c.do(); err != nil {
 			return false, err
 		}
 	case segmentindex.StrategyRoaringSet:
-		leftSegment := sg.segmentAtPos(pair[0])
-		rightSegment := sg.segmentAtPos(pair[1])
-
 		leftCursor := leftSegment.newRoaringSetCursor()
 		rightCursor := rightSegment.newRoaringSetCursor()
 
 		c := roaringset.NewCompactor(f, leftCursor, rightCursor,
 			level, scratchSpacePath, cleanupTombstones)
 
+		if sg.metrics != nil {
+			sg.metrics.CompactionRoaringSet.With(prometheus.Labels{"path": pathLabel}).Set(1)
+			defer sg.metrics.CompactionRoaringSet.With(prometheus.Labels{"path": pathLabel}).Set(0)
+		}
+
+		if err := c.Do(); err != nil {
+			return false, err
+		}
+
+	case segmentindex.StrategyRoaringSetRange:
+		leftCursor := leftSegment.newRoaringSetRangeCursor()
+		rightCursor := rightSegment.newRoaringSetRangeCursor()
+
+		c := roaringsetrange.NewCompactor(f, leftCursor, rightCursor,
+			level, cleanupTombstones)
+
+		if sg.metrics != nil {
+			sg.metrics.CompactionRoaringSetRange.With(prometheus.Labels{"path": pathLabel}).Set(1)
+			defer sg.metrics.CompactionRoaringSetRange.With(prometheus.Labels{"path": pathLabel}).Set(0)
+		}
+
 		if err := c.Do(); err != nil {
 			return false, err
 		}
 
 	default:
-		return false, fmt.Errorf("unrecognized strategy %v", strategy)
+		return false, errors.Errorf("unrecognized strategy %v", strategy)
+	}
+
+	if err := f.Sync(); err != nil {
+		return false, errors.Wrap(err, "fsync compacted segment file")
 	}
 
 	if err := f.Close(); err != nil {
-		return false, fmt.Errorf("close compacted segment file: %w", err)
+		return false, errors.Wrap(err, "close compacted segment file")
 	}
 
 	if err := sg.replaceCompactedSegments(pair[0], pair[1], path); err != nil {
-		return false, fmt.Errorf("replace compacted segments: %w", err)
+		return false, errors.Wrap(err, "replace compacted segments")
 	}
 
 	return true, nil
 }
 
-func (sg *SegmentGroup) replaceCompactedSegments(old1, old2 int, newPathTmp string) error {
+func (sg *SegmentGroup) replaceCompactedSegments(old1, old2 int,
+	newPathTmp string,
+) error {
 	sg.maintenanceLock.RLock()
 	updatedCountNetAdditions := sg.segments[old1].countNetAdditions +
 		sg.segments[old2].countNetAdditions
 	sg.maintenanceLock.RUnlock()
 
+	err := func() error {
+		sg.maintenanceLock.Lock()
+		defer sg.maintenanceLock.Unlock()
+
+		leftSegment := sg.segments[old1]
+		rightSegment := sg.segments[old2]
+		newSegmentId := "segment-" + segmentID(leftSegment.path) + "_" + segmentID(rightSegment.path)
+
+		// delete any existing bloom tmp files in the form of segment-<seg1>_<seg2>*bloom.tmp
+		tmpFiles, err := filepath.Glob(filepath.Join(sg.dir, newSegmentId+"*bloom.tmp"))
+		if err != nil {
+			return errors.Wrap(err, "glob tmp files")
+		}
+
+		for _, tmpFile := range tmpFiles {
+			err = os.Remove(tmpFile)
+			if err != nil {
+				return errors.Wrap(err, "remove tmp file")
+			}
+		}
+		return nil
+	}()
+	if err != nil {
+		return err
+	}
+
+	leftSegment := sg.segments[old1]
+	rightSegment := sg.segments[old2]
+
+	// WIP: we could add a random suffix to the tmp file to avoid conflicts
 	precomputedFiles, err := preComputeSegmentMeta(newPathTmp,
 		updatedCountNetAdditions, sg.logger,
 		sg.useBloomFilter, sg.calcCountNetAdditions)
@@ -182,41 +319,50 @@ func (sg *SegmentGroup) replaceCompactedSegments(old1, old2 int, newPathTmp stri
 	sg.maintenanceLock.Lock()
 	defer sg.maintenanceLock.Unlock()
 
-	if err := sg.segments[old1].close(); err != nil {
-		return fmt.Errorf("close disk segment: %w", err)
+	if err := leftSegment.close(); err != nil {
+		return errors.Wrap(err, "close disk segment")
 	}
 
-	if err := sg.segments[old2].close(); err != nil {
-		return fmt.Errorf("close disk segment: %w", err)
+	if err := rightSegment.close(); err != nil {
+		return errors.Wrap(err, "close disk segment")
 	}
 
-	if err := sg.segments[old1].drop(); err != nil {
-		return fmt.Errorf("drop disk segment: %w", err)
+	if err := leftSegment.drop(); err != nil {
+		return errors.Wrap(err, "drop disk segment")
 	}
 
-	if err := sg.segments[old2].drop(); err != nil {
-		return fmt.Errorf("drop disk segment: %w", err)
+	if err := rightSegment.drop(); err != nil {
+		return errors.Wrap(err, "drop disk segment")
+	}
+
+	err = fsync(sg.dir)
+	if err != nil {
+		return fmt.Errorf("fsync segment directory %s: %w", sg.dir, err)
 	}
 
 	sg.segments[old1] = nil
 	sg.segments[old2] = nil
 
 	var newPath string
+	// the old segments have been deleted, we can now safely remove the .tmp
+	// extension from the new segment itself and the pre-computed files which
+	// carried the name of the second old segment
 	for i, path := range precomputedFiles {
-		updated, err := sg.stripTmpExtension(path)
+		updated, err := sg.stripTmpExtension(path, segmentID(leftSegment.path), segmentID(rightSegment.path))
 		if err != nil {
-			return fmt.Errorf("strip .tmp extension of new segment: %w", err)
+			return errors.Wrap(err, "strip .tmp extension of new segment")
 		}
 
 		if i == 0 {
+			// the first element in the list is the segment itself
 			newPath = updated
 		}
 	}
 
-	seg, err := newSegment(newPath, sg.logger, nil,
-		sg.mmapContents, sg.useBloomFilter, sg.calcCountNetAdditions)
+	seg, err := newSegment(newPath, sg.logger, sg.metrics, nil,
+		sg.mmapContents, sg.useBloomFilter, sg.calcCountNetAdditions, false)
 	if err != nil {
-		return fmt.Errorf("create new segment: %w", err)
+		return errors.Wrap(err, "create new segment")
 	}
 
 	sg.segments[old2] = seg
@@ -226,21 +372,24 @@ func (sg *SegmentGroup) replaceCompactedSegments(old1, old2 int, newPathTmp stri
 	return nil
 }
 
-func (sg *SegmentGroup) stripTmpExtension(oldPath string) (string, error) {
+func (sg *SegmentGroup) stripTmpExtension(oldPath, left, right string) (string, error) {
 	ext := filepath.Ext(oldPath)
 	if ext != ".tmp" {
-		return "", fmt.Errorf("segment %q did not have .tmp extension", oldPath)
+		return "", errors.Errorf("segment %q did not have .tmp extension", oldPath)
 	}
 	newPath := oldPath[:len(oldPath)-len(ext)]
 
+	newPath = strings.ReplaceAll(newPath, fmt.Sprintf("%s_%s", left, right), right)
+
 	if err := os.Rename(oldPath, newPath); err != nil {
-		return "", fmt.Errorf("rename %q -> %q: %w", oldPath, newPath, err)
+		return "", errors.Wrapf(err, "rename %q -> %q", oldPath, newPath)
 	}
 
 	return newPath, nil
 }
 
 func (sg *SegmentGroup) compactIfLevelsMatch(shouldAbort cyclemanager.ShouldAbortCallback) bool {
+	sg.monitorSegments()
 
 	compacted, err := sg.compactOnce()
 	if err != nil {
@@ -265,4 +414,124 @@ func (sg *SegmentGroup) Len() int {
 	defer sg.maintenanceLock.RUnlock()
 
 	return len(sg.segments)
+}
+
+func (sg *SegmentGroup) monitorSegments() {
+	if sg.metrics == nil || sg.metrics.groupClasses {
+		return
+	}
+
+	sg.metrics.ActiveSegments.With(prometheus.Labels{
+		"strategy": sg.strategy,
+		"path":     sg.dir,
+	}).Set(float64(sg.Len()))
+
+	stats := sg.segmentLevelStats()
+	stats.fillMissingLevels()
+	stats.report(sg.metrics, sg.strategy, sg.dir)
+}
+
+type segmentLevelStats struct {
+	indexes  map[uint16]int
+	payloads map[uint16]int
+	count    map[uint16]int
+}
+
+func newSegmentLevelStats() segmentLevelStats {
+	return segmentLevelStats{
+		indexes:  map[uint16]int{},
+		payloads: map[uint16]int{},
+		count:    map[uint16]int{},
+	}
+}
+
+func (sg *SegmentGroup) segmentLevelStats() segmentLevelStats {
+	sg.maintenanceLock.RLock()
+	defer sg.maintenanceLock.RUnlock()
+
+	stats := newSegmentLevelStats()
+
+	for _, seg := range sg.segments {
+		stats.count[seg.level]++
+
+		cur := stats.indexes[seg.level]
+		cur += seg.index.Size()
+		stats.indexes[seg.level] = cur
+
+		cur = stats.payloads[seg.level]
+		cur += seg.PayloadSize()
+		stats.payloads[seg.level] = cur
+	}
+
+	return stats
+}
+
+// fill missing levels
+//
+// Imagine we had exactly two segments of level 4 before, and there were just
+// compacted to single segment of level 5. As a result, there should be no
+// more segments of level 4. However, our current logic only loops over
+// existing segments. As a result, we need to check what the highest level
+// is, then for every level lower than the highest check if we are missing
+// data. If yes, we need to explicitly set the gauges to 0.
+func (s *segmentLevelStats) fillMissingLevels() {
+	maxLevel := uint16(0)
+	for level := range s.count {
+		if level > maxLevel {
+			maxLevel = level
+		}
+	}
+
+	if maxLevel > 0 {
+		for level := uint16(0); level < maxLevel; level++ {
+			if _, ok := s.count[level]; ok {
+				continue
+			}
+
+			// there is no entry for this level, we must explicitly set it to 0
+			s.count[level] = 0
+			s.indexes[level] = 0
+			s.payloads[level] = 0
+		}
+	}
+}
+
+func (s *segmentLevelStats) report(metrics *Metrics,
+	strategy, dir string,
+) {
+	for level, size := range s.indexes {
+		metrics.SegmentSize.With(prometheus.Labels{
+			"strategy": strategy,
+			"unit":     "index",
+			"level":    fmt.Sprint(level),
+			"path":     dir,
+		}).Set(float64(size))
+	}
+
+	for level, size := range s.payloads {
+		metrics.SegmentSize.With(prometheus.Labels{
+			"strategy": strategy,
+			"unit":     "payload",
+			"level":    fmt.Sprint(level),
+			"path":     dir,
+		}).Set(float64(size))
+	}
+
+	for level, count := range s.count {
+		metrics.SegmentCount.With(prometheus.Labels{
+			"strategy": strategy,
+			"level":    fmt.Sprint(level),
+			"path":     dir,
+		}).Set(float64(count))
+	}
+}
+
+func (sg *SegmentGroup) compactionFitsSizeLimit(left, right *segment) bool {
+	if sg.maxSegmentSize == 0 {
+		// no limit is set, always return true
+		return true
+	}
+
+	totalSize := left.size + right.size
+	return totalSize <= sg.maxSegmentSize
 }

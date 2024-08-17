@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -22,6 +22,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/segmentindex"
 	"github.com/weaviate/weaviate/entities/lsmkv"
+	entsentry "github.com/weaviate/weaviate/entities/sentry"
 	"github.com/willf/bloom"
 )
 
@@ -61,17 +62,30 @@ type diskIndex interface {
 	// value (or the exact value if present)
 	Seek(key []byte) (segmentindex.Node, error)
 
+	Next(key []byte) (segmentindex.Node, error)
+
 	// AllKeys in no specific order, e.g. for building a bloom filter
 	AllKeys() ([][]byte, error)
 
 	// Size of the index in bytes
 	Size() int
+
+	QuantileKeys(q int) [][]byte
 }
 
 func newSegment(path string, logger logrus.FieldLogger,
 	existsLower existsOnLowerSegmentsFn, mmapContents bool,
-	useBloomFilter bool, calcCountNetAdditions bool,
-) (*segment, error) {
+	useBloomFilter bool, calcCountNetAdditions bool, overwriteDerived bool,
+) (_ *segment, err error) {
+	defer func() {
+		p := recover()
+		if p == nil {
+			return
+		}
+		entsentry.Recover(p)
+		err = fmt.Errorf("unexpected error loading segment %q: %v", path, p)
+	}()
+
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open file: %w", err)
@@ -92,11 +106,8 @@ func newSegment(path string, logger logrus.FieldLogger,
 		return nil, fmt.Errorf("parse header: %w", err)
 	}
 
-	switch header.Strategy {
-	case segmentindex.StrategyReplace, segmentindex.StrategySetCollection,
-		segmentindex.StrategyMapCollection, segmentindex.StrategyRoaringSet:
-	default:
-		return nil, fmt.Errorf("unsupported strategy in segment")
+	if err := segmentindex.CheckExpectedStrategy(header.Strategy); err != nil {
+		return nil, fmt.Errorf("unsupported strategy in segment: %w", err)
 	}
 
 	primaryIndex, err := header.PrimaryIndex(contents)
@@ -144,12 +155,12 @@ func newSegment(path string, logger logrus.FieldLogger,
 	}
 
 	if seg.useBloomFilter {
-		if err := seg.initBloomFilters(); err != nil {
+		if err := seg.initBloomFilters( overwriteDerived); err != nil {
 			return nil, err
 		}
 	}
 	if seg.calcCountNetAdditions {
-		if err := seg.initCountNetAdditions(existsLower); err != nil {
+		if err := seg.initCountNetAdditions(existsLower, overwriteDerived); err != nil {
 			return nil, err
 		}
 	}
@@ -254,7 +265,7 @@ func (s *segment) copyNode(b []byte, offset nodeOffset) error {
 	if err != nil {
 		return fmt.Errorf("copy node: %w", err)
 	}
-	_, err = n.Read(b)
+	_, err = io.ReadFull(n, b)
 	return err
 }
 

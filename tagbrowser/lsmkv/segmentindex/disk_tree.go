@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -13,6 +13,7 @@ package segmentindex
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 
@@ -120,10 +121,18 @@ func (t *DiskTree) Seek(key []byte) (Node, error) {
 		return Node{}, lsmkv.NotFound
 	}
 
-	return t.seekAt(0, key)
+	return t.seekAt(0, key, true)
 }
 
-func (t *DiskTree) seekAt(offset int64, key []byte) (Node, error) {
+func (t *DiskTree) Next(key []byte) (Node, error) {
+	if len(t.data) == 0 {
+		return Node{}, lsmkv.NotFound
+	}
+
+	return t.seekAt(0, key, false)
+}
+
+func (t *DiskTree) seekAt(offset int64, key []byte, includingKey bool) (Node, error) {
 	node, err := t.readNodeAt(offset)
 	if err != nil {
 		return Node{}, err
@@ -135,7 +144,7 @@ func (t *DiskTree) seekAt(offset int64, key []byte) (Node, error) {
 		End:   node.endPos,
 	}
 
-	if bytes.Equal(key, node.key) {
+	if includingKey && bytes.Equal(key, node.key) {
 		return self, nil
 	}
 
@@ -144,12 +153,12 @@ func (t *DiskTree) seekAt(offset int64, key []byte) (Node, error) {
 			return self, nil
 		}
 
-		left, err := t.seekAt(node.leftChild, key)
+		left, err := t.seekAt(node.leftChild, key, includingKey)
 		if err == nil {
 			return left, nil
 		}
 
-		if err == lsmkv.NotFound {
+		if errors.Is(err, lsmkv.NotFound) {
 			return self, nil
 		}
 
@@ -159,7 +168,7 @@ func (t *DiskTree) seekAt(offset int64, key []byte) (Node, error) {
 			return Node{}, lsmkv.NotFound
 		}
 
-		return t.seekAt(node.rightChild, key)
+		return t.seekAt(node.rightChild, key, includingKey)
 	}
 }
 
@@ -178,7 +187,7 @@ func (t *DiskTree) AllKeys() ([][]byte, error) {
 	for {
 		node, readLength, err := t.readNode(t.data[bufferPos:])
 		bufferPos += readLength
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

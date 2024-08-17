@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -12,15 +12,20 @@
 package lsmkv
 
 import (
+	"bufio"
 	"context"
-	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/pkg/errors"
+	"github.com/weaviate/weaviate/entities/diskio"
 )
 
-func (b *Bucket) recoverFromCommitLogs(ctx context.Context) error {
+func (b *Bucket) mayRecoverFromCommitLogs(ctx context.Context) error {
+	beforeAll := time.Now()
+	defer b.metrics.TrackStartupBucketRecovery(beforeAll)
 
 	// the context is only ever checked once at the beginning, as there is no
 	// point in aborting an ongoing recovery. It makes more sense to let it
@@ -44,27 +49,68 @@ func (b *Bucket) recoverFromCommitLogs(ctx context.Context) error {
 			continue
 		}
 
-		if filepath.Join(b.dir, fileInfo.Name()) == b.active.path+".wal" {
-			// this is the new one which was just created
-			continue
-		}
-
 		walFileNames = append(walFileNames, fileInfo.Name())
-	}
-
-	if len(walFileNames) == 0 {
-		// nothing to recover from
-		return nil
 	}
 
 	// recover from each log
 	for _, fname := range walFileNames {
-		b.logger.WithField("action", "lsm_recover_from_active_wal").
-			WithField("path", filepath.Join(b.dir, fname)).
-			Warning("active write-ahead-log found. Did weaviate crash prior to this? Trying to recover...")
+		path := filepath.Join(b.dir, strings.TrimSuffix(fname, ".wal"))
 
-		if err := b.parseWALIntoMemtable(filepath.Join(b.dir, fname)); err != nil {
-			return errors.Wrapf(err, "ingest wal %q", fname)
+		cl, err := newCommitLogger(path)
+		if err != nil {
+			return errors.Wrap(err, "init commit logger")
+		}
+		defer cl.close()
+
+		cl.pause()
+		defer cl.unpause()
+
+		stat, err := cl.file.Stat()
+		if err != nil {
+			return errors.Wrap(err, "stat commit log")
+		}
+
+		if stat.Size() == 0 {
+			b.logger.WithField("action", "lsm_recover_from_active_wal").
+				WithField("path", path).
+				Warning("empty write-ahead-log found. Did weaviate crash prior to this or the tenant on/loaded from the cloud? Nothing to recover from this file.")
+			continue
+		}
+
+		mt, err := newMemtable(path, b.strategy, b.secondaryIndices, cl, b.metrics, b.logger)
+		if err != nil {
+			return err
+		}
+
+		b.logger.WithField("action", "lsm_recover_from_active_wal").
+			WithField("path", path).
+			Warning("active write-ahead-log found. Did weaviate crash prior to this or the tenant on/loaded from the cloud? Trying to recover...")
+
+		meteredReader := diskio.NewMeteredReader(bufio.NewReader(cl.file), b.metrics.TrackStartupReadWALDiskIO)
+
+		err = newCommitLoggerParser(b.strategy, meteredReader, mt).Do()
+		if err != nil {
+			b.logger.WithField("action", "lsm_recover_from_active_wal_corruption").
+				WithField("path", filepath.Join(b.dir, fname)).
+				Error(errors.Wrap(err, "write-ahead-log ended abruptly, some elements may not have been recovered"))
+		}
+
+		if err := mt.flush(); err != nil {
+			return errors.Wrap(err, "flush memtable after WAL recovery")
+		}
+
+		if mt.Size() == 0 {
+			continue
+		}
+
+		if err := b.disk.add(path + ".db"); err != nil {
+			return err
+		}
+
+		if b.strategy == StrategyReplace && b.monitorCount {
+			// having just flushed the memtable we now have the most up2date count which
+			// is a good place to update the metric
+			b.metrics.ObjectCount(b.disk.count())
 		}
 
 		b.logger.WithField("action", "lsm_recover_from_active_wal_success").
@@ -72,43 +118,5 @@ func (b *Bucket) recoverFromCommitLogs(ctx context.Context) error {
 			Info("successfully recovered from write-ahead-log")
 	}
 
-	if b.active.size > 0 {
-		if err := b.FlushAndSwitch(); err != nil {
-			return errors.Wrap(err, "flush memtable after WAL recovery")
-		}
-	}
-
-	// delete the commit logs as we can now be sure that they are part of a disk
-	// segment
-	for _, fname := range walFileNames {
-		if err := os.RemoveAll(filepath.Join(b.dir, fname)); err != nil {
-			return errors.Wrap(err, "clean up commit log")
-		}
-	}
-
 	return nil
-}
-
-func (b *Bucket) parseWALIntoMemtable(fname string) error {
-	// pause commit logging while reading the old log to avoid creating a
-	// duplicate of the log
-	b.active.commitlog.pause()
-	defer b.active.commitlog.unpause()
-
-	err := newCommitLoggerParser(fname, b.active, b.strategy).Do()
-	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		// we need to check for both EOF or UnexpectedEOF, as we don't know where
-		// the commit log got corrupted, a field ending that weset a longer
-		// encoding for would return EOF, whereas a field read with binary.Read
-		// with a fixed size would return UnexpectedEOF. From our perspective both
-		// are unexpected.
-
-		b.logger.WithField("action", "lsm_recover_from_active_wal_corruption").
-			WithField("path", filepath.Join(b.dir, fname)).
-			Error("write-ahead-log ended abruptly, some elements may not have been recovered")
-
-		return nil
-	}
-
-	return err
 }

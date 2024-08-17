@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -12,10 +12,8 @@
 package lsmkv
 
 import (
-	"fmt"
-
 	"github.com/weaviate/sroar"
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/roaringset"
+	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
 )
 
 type CursorRoaringSet interface {
@@ -55,12 +53,9 @@ func (b *Bucket) CursorRoaringSetKeyOnly() CursorRoaringSet {
 }
 
 func (b *Bucket) cursorRoaringSet(keyOnly bool) CursorRoaringSet {
-	b.flushLock.RLock()
+	MustBeExpectedStrategy(b.strategy, StrategyRoaringSet)
 
-	// TODO move to helper func
-	if err := checkStrategyRoaringSet(b.strategy); err != nil {
-		panic(fmt.Sprintf("CursorRoaringSet() called on strategy other than '%s'", StrategyRoaringSet))
-	}
+	b.flushLock.RLock()
 
 	innerCursors, unlockSegmentGroup := b.disk.newRoaringSetCursors()
 

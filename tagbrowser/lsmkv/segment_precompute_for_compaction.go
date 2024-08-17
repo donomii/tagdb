@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -62,11 +62,8 @@ func preComputeSegmentMeta(path string, updatedCountNetAdditions int,
 		return nil, fmt.Errorf("parse header: %w", err)
 	}
 
-	switch header.Strategy {
-	case segmentindex.StrategyReplace, segmentindex.StrategySetCollection,
-		segmentindex.StrategyMapCollection, segmentindex.StrategyRoaringSet:
-	default:
-		return nil, fmt.Errorf("unsupported strategy in segment")
+	if err := segmentindex.CheckExpectedStrategy(header.Strategy); err != nil {
+		return nil, fmt.Errorf("unsupported strategy in segment: %w", err)
 	}
 
 	primaryIndex, err := header.PrimaryIndex(contents)

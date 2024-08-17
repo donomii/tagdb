@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -17,42 +17,61 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"sync"
+
+	enterrors "github.com/weaviate/weaviate/entities/errors"
+	entsentry "github.com/weaviate/weaviate/entities/sentry"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/weaviate/weaviate/entities/cyclemanager"
 	"github.com/weaviate/weaviate/entities/errorcompounder"
 	"github.com/weaviate/weaviate/entities/storagestate"
+	wsync "github.com/weaviate/weaviate/entities/sync"
 )
+
+var ErrAlreadyClosed = errors.New("store already closed")
 
 // Store groups multiple buckets together, it "owns" one folder on the file
 // system
 type Store struct {
-	dir           string
-	rootDir       string
-	bucketsByName map[string]*Bucket
-	logger        logrus.FieldLogger
-
-	cycleCallbacks *storeCycleCallbacks
+	dir     string
+	rootDir string
 
 	// Prevent concurrent manipulations to the bucketsByNameMap, most notably
 	// when initializing buckets in parallel
 	bucketAccessLock sync.RWMutex
+	bucketsByName    map[string]*Bucket
+
+	logger  logrus.FieldLogger
+	metrics *Metrics
+
+	cycleCallbacks *storeCycleCallbacks
+	bcreator       BucketCreator
+	// Prevent concurrent manipulations to the same Bucket, specially if there is
+	// action on the bucket in the meantime.
+	bucketsLocks *wsync.KeyLocker
+
+	closeLock sync.RWMutex
+	closed    bool
 }
 
 // New initializes a new [Store] based on the root dir. If state is present on
 // disk, it is loaded, if the folder is empty a new store is initialized in
 // there.
-func New(dir, rootDir string, logger logrus.FieldLogger,
+func New(dir, rootDir string, logger logrus.FieldLogger, metrics *Metrics,
 	shardCompactionCallbacks, shardFlushCallbacks cyclemanager.CycleCallbackGroup,
 ) (*Store, error) {
 	s := &Store{
 		dir:           dir,
 		rootDir:       rootDir,
 		bucketsByName: map[string]*Bucket{},
+		bucketsLocks:  wsync.NewKeyLocker(),
+		bcreator:      NewBucketCreator(),
 		logger:        logger,
+		metrics:       metrics,
 	}
 	s.initCycleCallbacks(shardCompactionCallbacks, shardFlushCallbacks)
 
@@ -66,7 +85,14 @@ func (s *Store) Bucket(name string) *Bucket {
 	return s.bucketsByName[name]
 }
 
-func (s *Store) UpdateBucketsStatus(targetStatus storagestate.Status) {
+func (s *Store) UpdateBucketsStatus(targetStatus storagestate.Status) error {
+	s.closeLock.RLock()
+	defer s.closeLock.RUnlock()
+
+	if s.closed {
+		return fmt.Errorf("%w: updating buckets state in store %q", ErrAlreadyClosed, s.dir)
+	}
+
 	// UpdateBucketsStatus is a write operation on the bucket itself, but from
 	// the perspective of our bucket access map this is a read-only operation,
 	// hence an RLock()
@@ -86,6 +112,8 @@ func (s *Store) UpdateBucketsStatus(targetStatus storagestate.Status) {
 			WithField("path", s.dir).
 			Warn("compaction halted due to shard READONLY status")
 	}
+
+	return nil
 }
 
 func (s *Store) init() error {
@@ -112,18 +140,56 @@ func (s *Store) bucketDir(bucketName string) string {
 //	b := store.Bucket("my_bucket_name")
 func (s *Store) CreateOrLoadBucket(ctx context.Context, bucketName string,
 	opts ...BucketOption,
-) error {
+) (err error) {
+	defer func() {
+		p := recover()
+		if p == nil {
+			// happy path
+			return
+		}
+
+		entsentry.Recover(p)
+
+		err = fmt.Errorf("unexpected error loading bucket %q at path %q: %v",
+			bucketName, s.rootDir, p)
+		// logger is already annotated to identify the store (e.g. collection +
+		// shard), we only need to annotate it with the exact path of this
+		// bucket.
+		s.logger.
+			WithFields(logrus.Fields{
+				"action":   "lsm_create_or_load_bucket",
+				"root_dir": s.rootDir,
+				"dir":      s.dir,
+				"bucket":   bucketName,
+			}).
+			WithError(err).Errorf("unexpected error loading shard")
+		debug.PrintStack()
+	}()
+
+	s.closeLock.RLock()
+	defer s.closeLock.RUnlock()
+
+	if s.closed {
+		return fmt.Errorf("%w: adding a bucket %q to store %q", ErrAlreadyClosed, bucketName, s.dir)
+	}
+
+	s.bucketsLocks.Lock(bucketName)
+	defer s.bucketsLocks.Unlock(bucketName)
+
 	if b := s.Bucket(bucketName); b != nil {
 		return nil
 	}
 
-	b, err := NewBucket(ctx, s.bucketDir(bucketName), s.rootDir, s.logger,
+	// bucket can be concurrently loaded with another buckets but
+	// the same bucket will be loaded only once
+	b, err := s.bcreator.NewBucket(ctx, s.bucketDir(bucketName), s.rootDir, s.logger, s.metrics,
 		s.cycleCallbacks.compactionCallbacks, s.cycleCallbacks.flushCallbacks, opts...)
 	if err != nil {
 		return err
 	}
 
 	s.setBucket(bucketName, b)
+
 	return nil
 }
 
@@ -135,8 +201,17 @@ func (s *Store) setBucket(name string, b *Bucket) {
 }
 
 func (s *Store) Shutdown(ctx context.Context) error {
-	s.bucketAccessLock.RLock()
-	defer s.bucketAccessLock.RUnlock()
+	s.closeLock.Lock()
+	defer s.closeLock.Unlock()
+
+	if s.closed {
+		return fmt.Errorf("%w: closing store %q", ErrAlreadyClosed, s.dir)
+	}
+
+	s.closed = true
+
+	s.bucketAccessLock.Lock()
+	defer s.bucketAccessLock.Unlock()
 
 	for name, bucket := range s.bucketsByName {
 		if err := bucket.Shutdown(ctx); err != nil {
@@ -148,6 +223,13 @@ func (s *Store) Shutdown(ctx context.Context) error {
 }
 
 func (s *Store) WriteWALs() error {
+	s.closeLock.RLock()
+	defer s.closeLock.RUnlock()
+
+	if s.closed {
+		return fmt.Errorf("%w: writing wals of store %q", ErrAlreadyClosed, s.dir)
+	}
+
 	s.bucketAccessLock.RLock()
 	defer s.bucketAccessLock.RUnlock()
 
@@ -207,6 +289,7 @@ func (s *Store) ListFiles(ctx context.Context, basePath string) ([]string, error
 func (s *Store) runJobOnBuckets(ctx context.Context,
 	jobFunc jobFunc, rollbackFunc rollbackFunc,
 ) ([]interface{}, error) {
+	s.bucketAccessLock.Lock()
 	var (
 		status      = newBucketJobStatus()
 		resultQueue = make(chan interface{}, len(s.bucketsByName))
@@ -216,16 +299,17 @@ func (s *Store) runJobOnBuckets(ctx context.Context,
 	for _, bucket := range s.bucketsByName {
 		wg.Add(1)
 		b := bucket
-		go func() {
+		f := func() {
 			status.Lock()
 			defer status.Unlock()
 			res, err := jobFunc(ctx, b)
 			resultQueue <- res
 			status.buckets[b] = err
 			wg.Done()
-		}()
+		}
+		enterrors.GoWrapper(f, s.logger)
 	}
-
+	s.bucketAccessLock.Unlock()
 	wg.Wait()
 	close(resultQueue)
 
@@ -275,6 +359,16 @@ func (s *Store) GetBucketsByName() map[string]*Bucket {
 func (s *Store) CreateBucket(ctx context.Context, bucketName string,
 	opts ...BucketOption,
 ) error {
+	s.closeLock.RLock()
+	defer s.closeLock.RUnlock()
+
+	if s.closed {
+		return fmt.Errorf("%w: adding a bucket %q to store %q", ErrAlreadyClosed, bucketName, s.dir)
+	}
+
+	s.bucketsLocks.Lock(bucketName)
+	defer s.bucketsLocks.Unlock(bucketName)
+
 	if b := s.Bucket(bucketName); b != nil {
 		return fmt.Errorf("bucket %s exists and is already in use", bucketName)
 	}
@@ -284,13 +378,14 @@ func (s *Store) CreateBucket(ctx context.Context, bucketName string,
 		return errors.Wrapf(err, "failed removing bucket %s files", bucketName)
 	}
 
-	b, err := NewBucket(ctx, bucketDir, s.rootDir, s.logger,
+	b, err := s.bcreator.NewBucket(ctx, bucketDir, s.rootDir, s.logger, s.metrics,
 		s.cycleCallbacks.compactionCallbacks, s.cycleCallbacks.flushCallbacks, opts...)
 	if err != nil {
 		return err
 	}
 
 	s.setBucket(bucketName, b)
+
 	return nil
 }
 
@@ -302,6 +397,13 @@ func (s *Store) CreateBucket(ctx context.Context, bucketName string,
 // its files deleted.
 // 2nd bucket becomes 1st bucket
 func (s *Store) ReplaceBuckets(ctx context.Context, bucketName, replacementBucketName string) error {
+	s.closeLock.RLock()
+	defer s.closeLock.RUnlock()
+
+	if s.closed {
+		return fmt.Errorf("%w: replacing bucket %q for %q in store %q", ErrAlreadyClosed, bucketName, replacementBucketName, s.dir)
+	}
+
 	s.bucketAccessLock.Lock()
 	defer s.bucketAccessLock.Unlock()
 
@@ -342,6 +444,13 @@ func (s *Store) ReplaceBuckets(ctx context.Context, bucketName, replacementBucke
 }
 
 func (s *Store) RenameBucket(ctx context.Context, bucketName, newBucketName string) error {
+	s.closeLock.RLock()
+	defer s.closeLock.RUnlock()
+
+	if s.closed {
+		return fmt.Errorf("%w: renaming bucket %q for %q in store %q", ErrAlreadyClosed, bucketName, newBucketName, s.dir)
+	}
+
 	s.bucketAccessLock.Lock()
 	defer s.bucketAccessLock.Unlock()
 

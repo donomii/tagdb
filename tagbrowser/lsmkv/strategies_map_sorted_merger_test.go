@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -12,6 +12,7 @@
 package lsmkv
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,7 +31,7 @@ func Test_SortedMapMerger_RemoveTombstones(t *testing.T) {
 
 		input := [][]MapPair{input1}
 
-		actual, err := m.do(input)
+		actual, err := m.do(context.Background(), input)
 		require.Nil(t, err)
 
 		expected := []MapPair{
@@ -57,7 +58,7 @@ func Test_SortedMapMerger_RemoveTombstones(t *testing.T) {
 
 		input := [][]MapPair{input1}
 
-		actual, err := m.do(input)
+		actual, err := m.do(context.Background(), input)
 		require.Nil(t, err)
 
 		expected := []MapPair{
@@ -86,7 +87,7 @@ func Test_SortedMapMerger_RemoveTombstones(t *testing.T) {
 			},
 		}
 
-		actual, err := m.do(input)
+		actual, err := m.do(context.Background(), input)
 		require.Nil(t, err)
 
 		expected := []MapPair{}
@@ -132,7 +133,7 @@ func Test_SortedMapMerger_RemoveTombstones(t *testing.T) {
 			},
 		}
 
-		actual, err := m.do(input)
+		actual, err := m.do(context.Background(), input)
 		require.Nil(t, err)
 
 		expected := []MapPair{
@@ -199,7 +200,7 @@ func Test_SortedMapMerger_RemoveTombstones(t *testing.T) {
 			},
 		}
 
-		actual, err := m.do(input)
+		actual, err := m.do(context.Background(), input)
 		require.Nil(t, err)
 
 		expected := []MapPair{

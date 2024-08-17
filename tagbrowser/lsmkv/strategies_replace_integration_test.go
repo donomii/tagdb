@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -64,9 +64,11 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 	dirName := t.TempDir()
 
 	t.Run("memtable-only", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -87,6 +89,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 			require.Nil(t, err)
 
 			assert.Equal(t, 3, b.Count())
+			assert.Equal(t, 0, b.CountAsync())
 
 			res, err := b.Get(key1)
 			require.Nil(t, err)
@@ -113,6 +116,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 			require.Nil(t, err)
 
 			assert.Equal(t, 3, b.Count())
+			assert.Equal(t, 0, b.CountAsync())
 
 			res, err := b.Get(key1)
 			require.Nil(t, err)
@@ -127,9 +131,11 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 	})
 
 	t.Run("with single flush in between updates", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -166,6 +172,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 
 		t.Run("count only objects on disk segment", func(t *testing.T) {
 			assert.Equal(t, 3, b.Count())
+			assert.Equal(t, 3, b.CountAsync())
 		})
 
 		t.Run("replace some, keep one", func(t *testing.T) {
@@ -184,6 +191,10 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 			// make sure that the updates aren't counted as additions
 			assert.Equal(t, 3, b.Count())
 
+			// happens to be the same value, but that's just a coincidence, async
+			// ignores the memtable
+			assert.Equal(t, 3, b.CountAsync())
+
 			res, err := b.Get(key1)
 			require.Nil(t, err)
 			assert.Equal(t, orig1, res)
@@ -197,9 +208,11 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 	})
 
 	t.Run("with a flush after the initial write and after the update", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -263,13 +276,16 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 
 		t.Run("count objects over several segments", func(t *testing.T) {
 			assert.Equal(t, 3, b.Count())
+			assert.Equal(t, 3, b.CountAsync())
 		})
 	})
 
 	t.Run("update in memtable, then do an orderly shutdown, and re-init", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -319,7 +335,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 		})
 
 		t.Run("init another bucket on the same files", func(t *testing.T) {
-			b2, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 				cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 			require.Nil(t, err)
 
@@ -342,6 +358,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 
 			// count objects over several segments after disk read
 			assert.Equal(t, 3, b2.Count())
+			assert.Equal(t, 3, b2.CountAsync())
 		})
 	})
 }
@@ -350,9 +367,11 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 	dirName := t.TempDir()
 
 	t.Run("memtable-only", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -441,9 +460,11 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 	})
 
 	t.Run("with single flush in between updates", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -500,9 +521,11 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 	})
 
 	t.Run("with a flush after initial write and update", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -570,9 +593,11 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 	})
 
 	t.Run("update in memtable then do an orderly shutdown and reinit", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -615,7 +640,7 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 		})
 
 		t.Run("init a new one and verify", func(t *testing.T) {
-			b2, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 				cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 			require.Nil(t, err)
 
@@ -644,9 +669,11 @@ func replaceInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOpti
 	dirName := t.TempDir()
 
 	t.Run("memtable-only", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -691,13 +718,18 @@ func replaceInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOpti
 
 		t.Run("count objects", func(t *testing.T) {
 			assert.Equal(t, 1, b.Count())
+			// all happenin in the memtable so far, async does not know of any
+			// objects yet
+			assert.Equal(t, 0, b.CountAsync())
 		})
 	})
 
 	t.Run("with single flush in between updates", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -746,13 +778,18 @@ func replaceInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOpti
 
 		t.Run("count objects", func(t *testing.T) {
 			assert.Equal(t, 1, b.Count())
+			// async still looks at the objects in the segment, ignores deletes in
+			// the memtable
+			assert.Equal(t, 3, b.CountAsync())
 		})
 	})
 
 	t.Run("with flushes after initial write and delete", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -804,6 +841,7 @@ func replaceInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOpti
 
 		t.Run("count objects", func(t *testing.T) {
 			assert.Equal(t, 1, b.Count())
+			assert.Equal(t, 1, b.CountAsync())
 		})
 	})
 }
@@ -813,9 +851,11 @@ func replaceCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 		r := getRandomSeed()
 		dirName := t.TempDir()
 
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -1046,9 +1086,11 @@ func replaceCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 		r := getRandomSeed()
 		dirName := t.TempDir()
 
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -1138,9 +1180,11 @@ func replaceCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 		r := getRandomSeed()
 		dirName := t.TempDir()
 
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)
@@ -1427,9 +1471,11 @@ func replaceCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 	t.Run("with deletes as latest in some segments", func(t *testing.T) {
 		dirName := t.TempDir()
 
-		b, err := NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
+
+		defer b.Shutdown(ctx)
 
 		// so big it effectively never triggers as part of this test
 		b.SetMemtableThreshold(1e9)

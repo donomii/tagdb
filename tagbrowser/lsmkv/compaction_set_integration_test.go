@@ -4,7 +4,7 @@
 //  \ V  V /  __/ (_| |\ V /| | (_| | ||  __/
 //   \_/\_/ \___|\__,_| \_/ |_|\__,_|\__\___|
 //
-//  Copyright © 2016 - 2023 Weaviate B.V. All rights reserved.
+//  Copyright © 2016 - 2024 Weaviate B.V. All rights reserved.
 //
 //  CONTACT: hello@weaviate.io
 //
@@ -25,7 +25,9 @@ import (
 	"github.com/weaviate/weaviate/entities/cyclemanager"
 )
 
-func compactionSetStrategy(ctx context.Context, t *testing.T, opts []BucketOption, expectedMinSize, expectedMaxSize int64) {
+func compactionSetStrategy(ctx context.Context, t *testing.T, opts []BucketOption,
+	expectedMinSize, expectedMaxSize int64,
+) {
 	size := 100
 
 	type kv struct {
@@ -230,7 +232,7 @@ func compactionSetStrategy(ctx context.Context, t *testing.T, opts []BucketOptio
 	})
 
 	t.Run("init bucket", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, dirName, nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, dirName, nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -356,7 +358,7 @@ func compactionSetStrategy_RemoveUnnecessary(ctx context.Context, t *testing.T, 
 	dirName := t.TempDir()
 
 	t.Run("init bucket", func(t *testing.T) {
-		b, err := NewBucket(ctx, dirName, dirName, nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, dirName, nullLogger(), nil,
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -451,7 +453,7 @@ func compactionSetStrategy_FrequentPutDeleteOperations(ctx context.Context, t *t
 			dirName := t.TempDir()
 
 			t.Run("init bucket", func(t *testing.T) {
-				b, err := NewBucket(ctx, dirName, dirName, nullLogger(), nil,
+				b, err := NewBucketCreator().NewBucket(ctx, dirName, dirName, nullLogger(), nil,
 					cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 				require.Nil(t, err)
 
