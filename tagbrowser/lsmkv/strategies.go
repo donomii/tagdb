@@ -14,7 +14,7 @@ package lsmkv
 import (
 	"fmt"
 
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/segmentindex"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/segmentindex"
 )
 
 const (

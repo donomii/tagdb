@@ -20,7 +20,7 @@ import (
 
 	"github.com/edsrzf/mmap-go"
 	"github.com/sirupsen/logrus"
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/segmentindex"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/segmentindex"
 	"github.com/weaviate/weaviate/entities/lsmkv"
 	entsentry "github.com/weaviate/weaviate/entities/sentry"
 	"github.com/willf/bloom"

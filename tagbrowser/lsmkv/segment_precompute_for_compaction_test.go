@@ -22,7 +22,7 @@ import (
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/segmentindex"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/segmentindex"
 	"github.com/weaviate/weaviate/entities/cyclemanager"
 )
 

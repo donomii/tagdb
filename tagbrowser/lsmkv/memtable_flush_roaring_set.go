@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/segmentindex"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/segmentindex"
 	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
 )
 
@@ -51,7 +51,9 @@ func (m *Memtable) flushDataRoaringSet(f io.Writer) ([]segmentindex.Key, error) 
 			return nil, fmt.Errorf("write node %d: %w", i, err)
 		}
 
-		keys[i] = ki
+		var nk segmentindex.Key
+		nk.Key = ki.Key
+		keys[i] = nk
 		totalWritten = ki.ValueEnd
 	}
 
