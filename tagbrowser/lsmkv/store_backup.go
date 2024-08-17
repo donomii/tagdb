@@ -15,8 +15,6 @@ import (
 	"context"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaviate/weaviate/usecases/monitoring"
 )
 
 // PauseCompaction waits for all ongoing compactions to finish,
@@ -33,16 +31,8 @@ func (s *Store) PauseCompaction(ctx context.Context) error {
 		return errors.Wrap(err, "long-running compaction in progress")
 	}
 
-	// TODO common_cycle_manager maybe not necessary, or to be replaced with store pause stats
-	for _, b := range s.bucketsByName {
-		label := b.dir
-		if monitoring.GetMetrics().Group {
-			label = "n/a"
-		}
-		if metric, err := monitoring.GetMetrics().BucketPauseDurations.GetMetricWithLabelValues(label); err == nil {
-			b.pauseTimer = prometheus.NewTimer(metric)
-		}
-	}
+
+
 
 	return nil
 }

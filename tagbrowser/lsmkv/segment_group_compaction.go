@@ -19,7 +19,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/segmentindex"
 	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
@@ -173,22 +172,15 @@ func (sg *SegmentGroup) compactOnce() (bool, error) {
 	strategy := leftSegment.strategy
 	cleanupTombstones := !sg.keepTombstones && pair[0] == 0
 
-	pathLabel := "n/a"
-	if sg.metrics != nil && !sg.metrics.groupClasses {
-		pathLabel = sg.dir
-	}
+
 	switch strategy {
 
-	// TODO: call metrics just once with variable strategy label
 
 	case segmentindex.StrategyReplace:
 		c := newCompactorReplace(f, leftSegment.newCursor(),
 			rightSegment.newCursor(), level, secondaryIndices, scratchSpacePath, cleanupTombstones)
 
-		if sg.metrics != nil {
-			sg.metrics.CompactionReplace.With(prometheus.Labels{"path": pathLabel}).Inc()
-			defer sg.metrics.CompactionReplace.With(prometheus.Labels{"path": pathLabel}).Dec()
-		}
+
 
 		if err := c.do(); err != nil {
 			return false, err
@@ -198,10 +190,7 @@ func (sg *SegmentGroup) compactOnce() (bool, error) {
 			rightSegment.newCollectionCursor(), level, secondaryIndices,
 			scratchSpacePath, cleanupTombstones)
 
-		if sg.metrics != nil {
-			sg.metrics.CompactionSet.With(prometheus.Labels{"path": pathLabel}).Inc()
-			defer sg.metrics.CompactionSet.With(prometheus.Labels{"path": pathLabel}).Dec()
-		}
+
 
 		if err := c.do(); err != nil {
 			return false, err
@@ -212,10 +201,7 @@ func (sg *SegmentGroup) compactOnce() (bool, error) {
 			rightSegment.newCollectionCursorReusable(),
 			level, secondaryIndices, scratchSpacePath, sg.mapRequiresSorting, cleanupTombstones)
 
-		if sg.metrics != nil {
-			sg.metrics.CompactionMap.With(prometheus.Labels{"path": pathLabel}).Inc()
-			defer sg.metrics.CompactionMap.With(prometheus.Labels{"path": pathLabel}).Dec()
-		}
+
 
 		if err := c.do(); err != nil {
 			return false, err
@@ -227,10 +213,7 @@ func (sg *SegmentGroup) compactOnce() (bool, error) {
 		c := roaringset.NewCompactor(f, leftCursor, rightCursor,
 			level, scratchSpacePath, cleanupTombstones)
 
-		if sg.metrics != nil {
-			sg.metrics.CompactionRoaringSet.With(prometheus.Labels{"path": pathLabel}).Set(1)
-			defer sg.metrics.CompactionRoaringSet.With(prometheus.Labels{"path": pathLabel}).Set(0)
-		}
+
 
 		if err := c.Do(); err != nil {
 			return false, err
@@ -243,10 +226,7 @@ func (sg *SegmentGroup) compactOnce() (bool, error) {
 		c := roaringsetrange.NewCompactor(f, leftCursor, rightCursor,
 			level, cleanupTombstones)
 
-		if sg.metrics != nil {
-			sg.metrics.CompactionRoaringSetRange.With(prometheus.Labels{"path": pathLabel}).Set(1)
-			defer sg.metrics.CompactionRoaringSetRange.With(prometheus.Labels{"path": pathLabel}).Set(0)
-		}
+
 
 		if err := c.Do(); err != nil {
 			return false, err
@@ -359,7 +339,7 @@ func (sg *SegmentGroup) replaceCompactedSegments(old1, old2 int,
 		}
 	}
 
-	seg, err := newSegment(newPath, sg.logger, sg.metrics, nil,
+	seg, err := newSegment(newPath, sg.logger,  nil,
 		sg.mmapContents, sg.useBloomFilter, sg.calcCountNetAdditions, false)
 	if err != nil {
 		return errors.Wrap(err, "create new segment")
@@ -417,18 +397,12 @@ func (sg *SegmentGroup) Len() int {
 }
 
 func (sg *SegmentGroup) monitorSegments() {
-	if sg.metrics == nil || sg.metrics.groupClasses {
-		return
-	}
 
-	sg.metrics.ActiveSegments.With(prometheus.Labels{
-		"strategy": sg.strategy,
-		"path":     sg.dir,
-	}).Set(float64(sg.Len()))
+
+
 
 	stats := sg.segmentLevelStats()
 	stats.fillMissingLevels()
-	stats.report(sg.metrics, sg.strategy, sg.dir)
 }
 
 type segmentLevelStats struct {
@@ -496,34 +470,14 @@ func (s *segmentLevelStats) fillMissingLevels() {
 	}
 }
 
-func (s *segmentLevelStats) report(metrics *Metrics,
+func (s *segmentLevelStats) report(
 	strategy, dir string,
 ) {
-	for level, size := range s.indexes {
-		metrics.SegmentSize.With(prometheus.Labels{
-			"strategy": strategy,
-			"unit":     "index",
-			"level":    fmt.Sprint(level),
-			"path":     dir,
-		}).Set(float64(size))
-	}
 
-	for level, size := range s.payloads {
-		metrics.SegmentSize.With(prometheus.Labels{
-			"strategy": strategy,
-			"unit":     "payload",
-			"level":    fmt.Sprint(level),
-			"path":     dir,
-		}).Set(float64(size))
-	}
 
-	for level, count := range s.count {
-		metrics.SegmentCount.With(prometheus.Labels{
-			"strategy": strategy,
-			"level":    fmt.Sprint(level),
-			"path":     dir,
-		}).Set(float64(count))
-	}
+
+
+
 }
 
 func (sg *SegmentGroup) compactionFitsSizeLimit(left, right *segment) bool {

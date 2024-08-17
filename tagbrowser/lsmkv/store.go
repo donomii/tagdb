@@ -46,7 +46,6 @@ type Store struct {
 	bucketsByName    map[string]*Bucket
 
 	logger  logrus.FieldLogger
-	metrics *Metrics
 
 	cycleCallbacks *storeCycleCallbacks
 	bcreator       BucketCreator
@@ -61,7 +60,7 @@ type Store struct {
 // New initializes a new [Store] based on the root dir. If state is present on
 // disk, it is loaded, if the folder is empty a new store is initialized in
 // there.
-func New(dir, rootDir string, logger logrus.FieldLogger, metrics *Metrics,
+func New(dir, rootDir string, logger logrus.FieldLogger,
 	shardCompactionCallbacks, shardFlushCallbacks cyclemanager.CycleCallbackGroup,
 ) (*Store, error) {
 	s := &Store{
@@ -71,7 +70,6 @@ func New(dir, rootDir string, logger logrus.FieldLogger, metrics *Metrics,
 		bucketsLocks:  wsync.NewKeyLocker(),
 		bcreator:      NewBucketCreator(),
 		logger:        logger,
-		metrics:       metrics,
 	}
 	s.initCycleCallbacks(shardCompactionCallbacks, shardFlushCallbacks)
 
@@ -182,7 +180,7 @@ func (s *Store) CreateOrLoadBucket(ctx context.Context, bucketName string,
 
 	// bucket can be concurrently loaded with another buckets but
 	// the same bucket will be loaded only once
-	b, err := s.bcreator.NewBucket(ctx, s.bucketDir(bucketName), s.rootDir, s.logger, s.metrics,
+	b, err := s.bcreator.NewBucket(ctx, s.bucketDir(bucketName), s.rootDir, s.logger,
 		s.cycleCallbacks.compactionCallbacks, s.cycleCallbacks.flushCallbacks, opts...)
 	if err != nil {
 		return err
@@ -378,7 +376,7 @@ func (s *Store) CreateBucket(ctx context.Context, bucketName string,
 		return errors.Wrapf(err, "failed removing bucket %s files", bucketName)
 	}
 
-	b, err := s.bcreator.NewBucket(ctx, bucketDir, s.rootDir, s.logger, s.metrics,
+	b, err := s.bcreator.NewBucket(ctx, bucketDir, s.rootDir, s.logger,
 		s.cycleCallbacks.compactionCallbacks, s.cycleCallbacks.flushCallbacks, opts...)
 	if err != nil {
 		return err

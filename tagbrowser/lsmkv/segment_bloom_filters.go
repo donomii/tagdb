@@ -35,7 +35,7 @@ func (s *segment) bloomFilterSecondaryPath(pos int) string {
 	return fmt.Sprintf("%s.secondary.%d.bloom", extless, pos)
 }
 
-func (s *segment) initBloomFilters(metrics *Metrics, overwrite bool) error {
+func (s *segment) initBloomFilters( overwrite bool) error {
 	if err := s.initBloomFilter(overwrite); err != nil {
 		return fmt.Errorf("init bloom filter for primary index: %w", err)
 	}
@@ -47,7 +47,7 @@ func (s *segment) initBloomFilters(metrics *Metrics, overwrite bool) error {
 			}
 		}
 	}
-	s.bloomFilterMetrics = newBloomFilterMetrics(metrics)
+	
 	return nil
 }
 

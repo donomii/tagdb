@@ -17,15 +17,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
+	
 
 	"github.com/pkg/errors"
 	"github.com/weaviate/weaviate/entities/diskio"
 )
 
 func (b *Bucket) mayRecoverFromCommitLogs(ctx context.Context) error {
-	beforeAll := time.Now()
-	defer b.metrics.TrackStartupBucketRecovery(beforeAll)
 
 	// the context is only ever checked once at the beginning, as there is no
 	// point in aborting an ongoing recovery. It makes more sense to let it
@@ -77,7 +75,7 @@ func (b *Bucket) mayRecoverFromCommitLogs(ctx context.Context) error {
 			continue
 		}
 
-		mt, err := newMemtable(path, b.strategy, b.secondaryIndices, cl, b.metrics, b.logger)
+		mt, err := newMemtable(path, b.strategy, b.secondaryIndices, cl,  b.logger)
 		if err != nil {
 			return err
 		}
@@ -86,7 +84,7 @@ func (b *Bucket) mayRecoverFromCommitLogs(ctx context.Context) error {
 			WithField("path", path).
 			Warning("active write-ahead-log found. Did weaviate crash prior to this or the tenant on/loaded from the cloud? Trying to recover...")
 
-		meteredReader := diskio.NewMeteredReader(bufio.NewReader(cl.file), b.metrics.TrackStartupReadWALDiskIO)
+		meteredReader := diskio.NewMeteredReader(bufio.NewReader(cl.file), nil)
 
 		err = newCommitLoggerParser(b.strategy, meteredReader, mt).Do()
 		if err != nil {
@@ -107,11 +105,7 @@ func (b *Bucket) mayRecoverFromCommitLogs(ctx context.Context) error {
 			return err
 		}
 
-		if b.strategy == StrategyReplace && b.monitorCount {
-			// having just flushed the memtable we now have the most up2date count which
-			// is a good place to update the metric
-			b.metrics.ObjectCount(b.disk.count())
-		}
+
 
 		b.logger.WithField("action", "lsm_recover_from_active_wal_success").
 			WithField("path", filepath.Join(b.dir, fname)).

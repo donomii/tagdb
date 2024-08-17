@@ -134,7 +134,6 @@ func NewBucketCreator() *Bucket { return &Bucket{} }
 func (*Bucket) NewBucket(ctx context.Context, dir, rootDir string, logger logrus.FieldLogger, compactionCallbacks, flushCallbacks cyclemanager.CycleCallbackGroup,
 	opts ...BucketOption,
 ) (*Bucket, error) {
-	beforeAll := time.Now()
 	defaultMemTableThreshold := uint64(10 * 1024 * 1024)
 	defaultWalThreshold := uint64(1024 * 1024 * 1024)
 	defaultFlushAfterDirty := FlushAfterDirtyDefault
