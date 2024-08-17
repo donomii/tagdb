@@ -19,85 +19,84 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
-	"sort"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/weaviate/weaviate/entities/cyclemanager"
-)
+		"sort"
+		"testing"
 
-func compactionMapStrategy(ctx context.Context, t *testing.T, opts []BucketOption,
-	expectedMinSize, expectedMaxSize int64,
-) {
-	size := 100
+		"github.com/stretchr/testify/assert"
+		"github.com/stretchr/testify/require"
+		"github.com/weaviate/weaviate/entities/cyclemanager"
+	)
 
-	type kv struct {
-		key    []byte
-		values []MapPair
-	}
+	func compactionMapStrategy(ctx context.Context, t *testing.T, opts []BucketOption, expectedMinSize, expectedMaxSize int64) {
+		size := 100
 
-	// this segment is not part of the merge, but might still play a role in
-	// overall results. For example if one of the later segments has a tombstone
-	// for it
-	var previous1 []kv
-	var previous2 []kv
+		type kv struct {
+			key    []byte
+			values []MapPair
+		}
 
-	var segment1 []kv
-	var segment2 []kv
-	var expected []kv
-	var bucket *Bucket
+		// this segment is not part of the merge, but might still play a role in
+		// overall results. For example if one of the later segments has a tombstone
+		// for it
+		var previous1 []kv
+		var previous2 []kv
 
-	dirName := t.TempDir()
+		var segment1 []kv
+		var segment2 []kv
+		var expected []kv
+		var bucket *Bucket
 
-	t.Run("create test data", func(t *testing.T) {
-		// The test data is split into 4 scenarios evenly:
-		//
-		// 0.) created in the first segment, never touched again
-		// 1.) created in the first segment, appended to it in the second
-		// 2.) created in the first segment, first element updated in the second
-		// 3.) created in the first segment, second element updated in the second
-		// 4.) created in the first segment, first element deleted in the second
-		// 5.) created in the first segment, second element deleted in the second
-		// 6.) not present in the first segment, created in the second
-		// 7.) present in an unrelated previous segment, deleted in the first
-		// 8.) present in an unrelated previous segment, deleted in the second
-		// 9.) present in an unrelated previous segment, never touched again
-		for i := 0; i < size; i++ {
-			rowKey := []byte(fmt.Sprintf("row-%03d", i))
+		dirName := t.TempDir()
 
-			pair1 := MapPair{
-				Key:   []byte(fmt.Sprintf("value-%03d-01", i)),
-				Value: []byte(fmt.Sprintf("value-%03d-01-original", i)),
-			}
-			pair2 := MapPair{
-				Key:   []byte(fmt.Sprintf("value-%03d-02", i)),
-				Value: []byte(fmt.Sprintf("value-%03d-02-original", i)),
-			}
-			pairs := []MapPair{pair1, pair2}
+		t.Run("create test data", func(t *testing.T) {
+			// The test data is split into 4 scenarios evenly:
+			//
+			// 0.) created in the first segment, never touched again
+			// 1.) created in the first segment, appended to it in the second
+			// 2.) created in the first segment, first element updated in the second
+			// 3.) created in the first segment, second element updated in the second
+			// 4.) created in the first segment, first element deleted in the second
+			// 5.) created in the first segment, second element deleted in the second
+			// 6.) not present in the first segment, created in the second
+			// 7.) present in an unrelated previous segment, deleted in the first
+			// 8.) present in an unrelated previous segment, deleted in the second
+			// 9.) present in an unrelated previous segment, never touched again
+			for i := 0; i < size; i++ {
+				rowKey := []byte(fmt.Sprintf("row-%03d", i))
 
-			switch i % 10 {
-			case 0:
-				// add to segment 1
-				segment1 = append(segment1, kv{
-					key:    rowKey,
-					values: pairs[:1],
-				})
+				pair1 := MapPair{
+					Key:   []byte(fmt.Sprintf("value-%03d-01", i)),
+					Value: []byte(fmt.Sprintf("value-%03d-01-original", i)),
+				}
+				pair2 := MapPair{
+					Key:   []byte(fmt.Sprintf("value-%03d-02", i)),
+					Value: []byte(fmt.Sprintf("value-%03d-02-original", i)),
+				}
+				pairs := []MapPair{pair1, pair2}
 
-				// leave this element untouched in the second segment
-				expected = append(expected, kv{
-					key:    rowKey,
-					values: pairs[:1],
-				})
-			case 1:
-				// add to segment 1
-				segment1 = append(segment1, kv{
-					key:    rowKey,
-					values: pairs[:1],
-				})
+				switch i % 10 {
+				case 0:
+					// add to segment 1
+					segment1 = append(segment1, kv{
+						key:    rowKey,
+						values: pairs[:1],
+					})
 
-				// add extra pair in the second segment
-				segment2 = append(segment2, kv{
+					// leave this element untouched in the second segment
+					expected = append(expected, kv{
+						key:    rowKey,
+						values: pairs[:1],
+					})
+				case 1:
+					// add to segment 1
+					segment1 = append(segment1, kv{
+						key:    rowKey,
+						values: pairs[:1],
+					})
+
+					// add extra pair in the second segment
+					segment2 = append(segment2, kv{
 					key:    rowKey,
 					values: pairs[1:2],
 				})

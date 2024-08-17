@@ -15,88 +15,87 @@
 package lsmkv
 
 import (
+
 	"context"
 	"fmt"
-	"math/rand"
-	"testing"
+		"math/rand"
+		"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/weaviate/weaviate/entities/cyclemanager"
-)
+		"github.com/stretchr/testify/assert"
+		"github.com/stretchr/testify/require"
+		"github.com/weaviate/weaviate/entities/cyclemanager"
+	)
 
-func compactionReplaceStrategy(ctx context.Context, t *testing.T, opts []BucketOption,
-	expectedMinSize, expectedMaxSize int64,
-) {
-	size := 200
+	func compactionReplaceStrategy(ctx context.Context, t *testing.T, opts []BucketOption, expectedMinSize, expectedMaxSize int64) {
+		size := 200
 
-	type kv struct {
-		key    []byte
-		value  []byte
-		delete bool
-	}
+		type kv struct {
+			key    []byte
+			value  []byte
+			delete bool
+		}
 
-	var segment1 []kv
-	var segment2 []kv
-	var expected []kv
-	var bucket *Bucket
+		var segment1 []kv
+		var segment2 []kv
+		var expected []kv
+		var bucket *Bucket
 
-	dirName := t.TempDir()
+		dirName := t.TempDir()
 
-	t.Run("create test data", func(t *testing.T) {
-		// The test data is split into 4 scenarios evenly:
-		//
-		// 1.) created in the first segment, never touched again
-		// 2.) created in the first segment, updated in the second
-		// 3.) created in the first segment, deleted in the second
-		// 4.) not present in the first segment, created in the second
-		for i := 0; i < size; i++ {
-			key := []byte(fmt.Sprintf("key-%3d", i))
-			originalValue := []byte(fmt.Sprintf("value-%3d-original", i))
+		t.Run("create test data", func(t *testing.T) {
+			// The test data is split into 4 scenarios evenly:
+			//
+			// 1.) created in the first segment, never touched again
+			// 2.) created in the first segment, updated in the second
+			// 3.) created in the first segment, deleted in the second
+			// 4.) not present in the first segment, created in the second
+			for i := 0; i < size; i++ {
+				key := []byte(fmt.Sprintf("key-%3d", i))
+				originalValue := []byte(fmt.Sprintf("value-%3d-original", i))
 
-			switch i % 4 {
-			case 0:
-				// add to segment 1
-				segment1 = append(segment1, kv{
-					key:   key,
-					value: originalValue,
-				})
+				switch i % 4 {
+				case 0:
+					// add to segment 1
+					segment1 = append(segment1, kv{
+						key:   key,
+						value: originalValue,
+					})
 
-				// leave this element untouched in the second segment
-				expected = append(expected, kv{
-					key:   key,
-					value: originalValue,
-				})
-			case 1:
-				// add to segment 1
-				segment1 = append(segment1, kv{
-					key:   key,
-					value: originalValue,
-				})
+					// leave this element untouched in the second segment
+					expected = append(expected, kv{
+						key:   key,
+						value: originalValue,
+					})
+				case 1:
+					// add to segment 1
+					segment1 = append(segment1, kv{
+						key:   key,
+						value: originalValue,
+					})
 
-				// update in the second segment
-				updatedValue := []byte(fmt.Sprintf("value-%3d-updated", i))
-				segment2 = append(segment2, kv{
-					key:   key,
-					value: updatedValue,
-				})
+					// update in the second segment
+					updatedValue := []byte(fmt.Sprintf("value-%3d-updated", i))
+					segment2 = append(segment2, kv{
+						key:   key,
+						value: updatedValue,
+					})
 
-				expected = append(expected, kv{
-					key:   key,
-					value: updatedValue,
-				})
-			case 2:
-				// add to segment 1
-				segment1 = append(segment1, kv{
-					key:   key,
-					value: originalValue,
-				})
+					expected = append(expected, kv{
+						key:   key,
+						value: updatedValue,
+					})
+				case 2:
+					// add to segment 1
+					segment1 = append(segment1, kv{
+						key:   key,
+						value: originalValue,
+					})
 
-				// delete in the second segment
-				segment2 = append(segment2, kv{
-					key:    key,
-					delete: true,
-				})
+					// delete in the second segment
+					segment2 = append(segment2, kv{
+						key:    key,
+						delete: true,
+					})
 
 				// do not add to expected at all
 

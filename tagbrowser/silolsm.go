@@ -154,7 +154,7 @@ func (s *WeaviateStore) InsertRecord(silo *tagSilo, key []byte, aRecord record) 
 
 	silo.count("weaviate_insert")
 	silo.record_cache.Store(silo.last_database_record, aRecord)
-	Debugf("Record %v inserted: %v", silo.last_database_record, val)
+	Debugf("Record %v inserted: %v", silo.last_database_record, string(val))
 }
 
 func (s *WeaviateStore) GetRecord(key []byte) record {
