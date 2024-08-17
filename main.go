@@ -11,6 +11,9 @@ import (
 	_ "github.com/nsf/termbox-go"
 	_ "github.com/skratchdot/open-golang/open"
 	_ "github.com/ungerik/go-dry"
+	_  "github.com/mattn/go-sqlite3"
+	_ "github.com/tchap/go-patricia/patricia"
+
 )
 
 func main() {
