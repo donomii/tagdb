@@ -18,8 +18,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringsetrange"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringset"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringsetrange"
 	"github.com/weaviate/weaviate/entities/lsmkv"
 )
 

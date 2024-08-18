@@ -14,7 +14,7 @@ package lsmkv
 import (
 	"github.com/pkg/errors"
 	"github.com/weaviate/sroar"
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringset"
 )
 
 func (m *Memtable) roaringSetAddOne(key []byte, value uint64) error {
@@ -134,7 +134,7 @@ func (m *Memtable) roaringSetAdjustMeta(entriesChanged int) {
 	// estimation is therefore to take the changed entries and multiply them by
 	// 2.
 	m.size += uint64(entriesChanged * 2)
-	
+
 	m.updateDirtyAt()
 }
 

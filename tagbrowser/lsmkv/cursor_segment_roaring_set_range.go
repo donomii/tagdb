@@ -12,7 +12,7 @@
 package lsmkv
 
 import (
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringsetrange"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringsetrange"
 )
 
 func (s *segment) newRoaringSetRangeCursor() *roaringsetrange.SegmentCursor {

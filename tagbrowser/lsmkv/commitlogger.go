@@ -20,7 +20,7 @@ import (
 	"sync/atomic"
 
 	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/rwhasher"
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringset"
 )
 
 type commitLogger struct {

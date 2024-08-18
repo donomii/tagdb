@@ -13,7 +13,7 @@ package lsmkv
 
 import (
 	"github.com/weaviate/sroar"
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringset"
 )
 
 type CursorRoaringSet interface {

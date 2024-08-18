@@ -16,7 +16,7 @@ import (
 	"io"
 
 	"github.com/donomii/tagdb/tagbrowser/lsmkv/segmentindex"
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringsetrange"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringsetrange"
 )
 
 func (m *Memtable) flushDataRoaringSetRange(w io.Writer) ([]segmentindex.Key, error) {

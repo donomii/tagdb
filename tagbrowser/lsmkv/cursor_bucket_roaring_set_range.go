@@ -13,7 +13,7 @@ package lsmkv
 
 import (
 	"github.com/weaviate/sroar"
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringsetrange"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringsetrange"
 )
 
 type CursorRoaringSetRange interface {

@@ -13,7 +13,7 @@ package lsmkv
 
 import (
 	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/segmentindex"
-	"github.com/weaviate/weaviate/adapters/repos/db/roaringset"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringset"
 )
 
 func (s *segment) newRoaringSetCursor() *roaringset.SegmentCursor {
