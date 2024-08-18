@@ -51,9 +51,8 @@ func (m *Memtable) flushDataRoaringSet(f io.Writer) ([]segmentindex.Key, error) 
 			return nil, fmt.Errorf("write node %d: %w", i, err)
 		}
 
-		var nk segmentindex.Key
-		nk.Key = ki.Key
-		keys[i] = nk
+
+		keys[i] = ki
 		totalWritten = ki.ValueEnd
 	}
 

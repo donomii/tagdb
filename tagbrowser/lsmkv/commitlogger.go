@@ -19,7 +19,7 @@ import (
 	"os"
 	"sync/atomic"
 
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/rwhasher"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/rwhasher"
 	"github.com/donomii/tagdb/tagbrowser/lsmkv/roaringset"
 )
 

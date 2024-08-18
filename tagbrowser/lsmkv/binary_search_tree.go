@@ -14,7 +14,7 @@ package lsmkv
 import (
 	"bytes"
 
-	"github.com/weaviate/weaviate/adapters/repos/db/lsmkv/rbtree"
+	"github.com/donomii/tagdb/tagbrowser/lsmkv/rbtree"
 	"github.com/weaviate/weaviate/entities/lsmkv"
 )
 
