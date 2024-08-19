@@ -4,6 +4,7 @@ package lsmkv
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"io/ioutil"
 
@@ -40,7 +41,7 @@ func MustNewBucket(ctx context.Context, dir, rootDir string, logger logrus.Field
 func NewReplaceableBucket(dir string) *ReplaceableBucket {
 	n := NewNullLogger()
 
-	return &ReplaceableBucket{MustNewBucket(context.Background(), dir, "", n, nil, nil, WithStrategy(StrategyReplace))}
+	return &ReplaceableBucket{MustNewBucket(context.Background(), dir, "", n, nil, nil, WithStrategy(StrategyReplace), WithUseBloomFilter(false), WithDirtyThreshold(1*time.Second))}
 }
 
 // Lsmkv creates temporary files to rapidly store incoming data.  Compact merges the files, which makes them quicker and more efficient to query.  This must be called explicitly, it does not run in the background, automatically.  It is thread safe, you can start your own background thread to call it.
