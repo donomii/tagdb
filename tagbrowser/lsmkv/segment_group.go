@@ -253,10 +253,6 @@ func newSegmentGroup(logger logrus.FieldLogger,
 
 	sg.segments = sg.segments[:segmentIndex]
 
-
-
-	id := "segmentgroup/compaction/" + sg.dir
-
 	return sg, nil
 }
 
