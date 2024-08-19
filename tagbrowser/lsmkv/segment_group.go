@@ -256,7 +256,6 @@ func newSegmentGroup(logger logrus.FieldLogger,
 
 
 	id := "segmentgroup/compaction/" + sg.dir
-	sg.compactionCallbackCtrl = compactionCallbacks.Register(id, sg.compactIfLevelsMatch)
 
 	return sg, nil
 }
