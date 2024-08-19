@@ -30,7 +30,7 @@ func TestCreateBloomOnFlush(t *testing.T) {
 
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger,
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -50,7 +50,7 @@ func TestCreateBloomOnFlush(t *testing.T) {
 	// on Windows we have to shutdown the bucket before opening it again
 	require.Nil(t, b.Shutdown(ctx))
 
-	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -73,7 +73,7 @@ func TestCreateBloomInit(t *testing.T) {
 
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -101,7 +101,7 @@ func TestCreateBloomInit(t *testing.T) {
 	require.Nil(t, b.Shutdown(ctx))
 
 	// now create a new bucket and assert that the file is re-created on init
-	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace))
 	require.Nil(t, err)
@@ -121,7 +121,7 @@ func TestRepairCorruptedBloomOnInit(t *testing.T) {
 
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace))
 	require.Nil(t, err)
@@ -141,7 +141,7 @@ func TestRepairCorruptedBloomOnInit(t *testing.T) {
 
 	// now create a new bucket and assert that the file is ignored, re-created on
 	// init, and the count matches
-	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace))
 	require.Nil(t, err)
@@ -158,7 +158,7 @@ func TestRepairTooShortBloomOnInit(t *testing.T) {
 
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace))
 	require.Nil(t, err)
@@ -177,7 +177,7 @@ func TestRepairTooShortBloomOnInit(t *testing.T) {
 
 	// now create a new bucket and assert that the file is ignored, re-created on
 	// init, and the count matches
-	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace))
 	require.Nil(t, err)
@@ -194,7 +194,7 @@ func TestRepairCorruptedBloomSecondaryOnInit(t *testing.T) {
 
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -215,7 +215,7 @@ func TestRepairCorruptedBloomSecondaryOnInit(t *testing.T) {
 
 	// now create a new bucket and assert that the file is ignored, re-created on
 	// init, and the count matches
-	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -244,7 +244,7 @@ func TestRepairCorruptedBloomSecondaryOnInitIntoMemory(t *testing.T) {
 
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -265,7 +265,7 @@ func TestRepairCorruptedBloomSecondaryOnInitIntoMemory(t *testing.T) {
 
 	// now create a new bucket and assert that the file is ignored, re-created on
 	// init, and the count matches
-	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -282,7 +282,7 @@ func TestRepairTooShortBloomSecondaryOnInit(t *testing.T) {
 
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -302,7 +302,7 @@ func TestRepairTooShortBloomSecondaryOnInit(t *testing.T) {
 
 	// now create a new bucket and assert that the file is ignored, re-created on
 	// init, and the count matches
-	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace), WithSecondaryIndices(1))
 	require.Nil(t, err)
@@ -374,7 +374,7 @@ func dontCreateBloom(ctx context.Context, t *testing.T, opts []BucketOption) {
 	dirName := t.TempDir()
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		opts...)
 	require.NoError(t, err)
@@ -412,7 +412,7 @@ func dontRecreateBloom(ctx context.Context, t *testing.T, opts []BucketOption) {
 	logger, _ := test.NewNullLogger()
 
 	t.Run("create, populate, shutdown", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 			opts...)
 		require.NoError(t, err)
@@ -423,7 +423,7 @@ func dontRecreateBloom(ctx context.Context, t *testing.T, opts []BucketOption) {
 		require.NoError(t, b.FlushMemtable())
 	})
 
-	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		opts...)
 	require.NoError(t, err)
@@ -454,7 +454,7 @@ func dontPrecomputeBloom(ctx context.Context, t *testing.T, opts []BucketOption)
 	dirName := t.TempDir()
 	logger, _ := test.NewNullLogger()
 
-	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, nil,
+	b, err := NewBucketCreator().NewBucket(ctx, dirName, "", logger, 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		opts...)
 	require.NoError(t, err)

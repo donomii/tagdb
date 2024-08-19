@@ -56,7 +56,7 @@ func mapInsertAndAppend(ctx context.Context, t *testing.T, opts []BucketOption) 
 	dirName := t.TempDir()
 
 	t.Run("memtable-only", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -148,7 +148,7 @@ func mapInsertAndAppend(ctx context.Context, t *testing.T, opts []BucketOption) 
 	})
 
 	t.Run("with a single flush between updates", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -244,7 +244,7 @@ func mapInsertAndAppend(ctx context.Context, t *testing.T, opts []BucketOption) 
 	})
 
 	t.Run("with flushes after initial and update", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -343,7 +343,7 @@ func mapInsertAndAppend(ctx context.Context, t *testing.T, opts []BucketOption) 
 	})
 
 	t.Run("update in memtable, then do an orderly shutdown, and re-init", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -407,7 +407,7 @@ func mapInsertAndAppend(ctx context.Context, t *testing.T, opts []BucketOption) 
 		})
 
 		t.Run("init another bucket on the same files", func(t *testing.T) {
-			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 				cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 			require.Nil(t, err)
 
@@ -449,7 +449,7 @@ func mapInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOption) 
 	dirName := t.TempDir()
 
 	t.Run("memtable-only", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -545,7 +545,7 @@ func mapInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOption) 
 	})
 
 	t.Run("with flushes between updates", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -649,7 +649,7 @@ func mapInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOption) 
 	})
 
 	t.Run("with memtable only, then an orderly shutdown and restart", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -717,7 +717,7 @@ func mapInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOption) 
 		})
 
 		t.Run("init another bucket on the same files", func(t *testing.T) {
-			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 				cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 			require.Nil(t, err)
 
@@ -758,7 +758,7 @@ func mapCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 		r := getRandomSeed()
 		dirName := t.TempDir()
 
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -946,7 +946,7 @@ func mapCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 		r := getRandomSeed()
 		dirName := t.TempDir()
 
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 

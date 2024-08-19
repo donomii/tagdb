@@ -44,7 +44,7 @@ func TestConcurrentWriting_Replace(t *testing.T) {
 	keys := make([][]byte, amount)
 	values := make([][]byte, amount)
 
-	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), nil,
+	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyReplace),
 		WithMemtableThreshold(10000))
@@ -141,7 +141,7 @@ func TestConcurrentWriting_Set(t *testing.T) {
 		cyclemanager.NewFixedTicker(5*time.Millisecond),
 		flushGroup.CycleCallback,
 		nullLogger()).Start()
-	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), nil,
+	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), 
 		cyclemanager.NewCallbackGroupNoop(), flushGroup,
 		WithStrategy(StrategySetCollection),
 		WithMemtableThreshold(10000))
@@ -235,7 +235,7 @@ func TestConcurrentWriting_RoaringSet(t *testing.T) {
 		cyclemanager.NewFixedTicker(5*time.Millisecond),
 		flushGroup.CycleCallback,
 		logger).Start()
-	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), nil,
+	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), 
 		cyclemanager.NewCallbackGroupNoop(), flushGroup,
 		WithStrategy(StrategyRoaringSet),
 		WithMemtableThreshold(1000))
@@ -319,7 +319,7 @@ func TestConcurrentWriting_RoaringSetRange(t *testing.T) {
 		cyclemanager.NewFixedTicker(5*time.Millisecond),
 		flushGroup.CycleCallback,
 		nullLogger()).Start()
-	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), nil,
+	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), 
 		cyclemanager.NewCallbackGroupNoop(), flushGroup,
 		WithStrategy(StrategyRoaringSetRange),
 		WithMemtableThreshold(1000),
@@ -396,7 +396,7 @@ func TestConcurrentWriting_Map(t *testing.T) {
 	keys := make([][]byte, amount)
 	values := make([][]MapPair, amount)
 
-	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), nil,
+	bucket, err := NewBucketCreator().NewBucket(testCtx(), dirName, "", nullLogger(), 
 		cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(),
 		WithStrategy(StrategyMapCollection),
 		WithMemtableThreshold(5000))

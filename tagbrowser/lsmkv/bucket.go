@@ -921,9 +921,6 @@ func (b *Bucket) Shutdown(ctx context.Context) error {
 		return err
 	}
 
-	if err := b.flushCallbackCtrl.Unregister(ctx); err != nil {
-		return fmt.Errorf("long-running flush in progress: %w", ctx.Err())
-	}
 
 	b.flushLock.Lock()
 	if err := b.active.flush(); err != nil {

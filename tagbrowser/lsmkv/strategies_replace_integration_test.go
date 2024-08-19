@@ -64,7 +64,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 	dirName := t.TempDir()
 
 	t.Run("memtable-only", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -131,7 +131,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 	})
 
 	t.Run("with single flush in between updates", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -208,7 +208,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 	})
 
 	t.Run("with a flush after the initial write and after the update", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -281,7 +281,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 	})
 
 	t.Run("update in memtable, then do an orderly shutdown, and re-init", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -335,7 +335,7 @@ func replaceInsertAndUpdate(ctx context.Context, t *testing.T, opts []BucketOpti
 		})
 
 		t.Run("init another bucket on the same files", func(t *testing.T) {
-			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 				cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 			require.Nil(t, err)
 
@@ -367,7 +367,7 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 	dirName := t.TempDir()
 
 	t.Run("memtable-only", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -460,7 +460,7 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 	})
 
 	t.Run("with single flush in between updates", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -521,7 +521,7 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 	})
 
 	t.Run("with a flush after initial write and update", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -593,7 +593,7 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 	})
 
 	t.Run("update in memtable then do an orderly shutdown and reinit", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -640,7 +640,7 @@ func replaceInsertAndUpdate_WithSecondaryKeys(ctx context.Context, t *testing.T,
 		})
 
 		t.Run("init a new one and verify", func(t *testing.T) {
-			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+			b2, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 				cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 			require.Nil(t, err)
 
@@ -669,7 +669,7 @@ func replaceInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOpti
 	dirName := t.TempDir()
 
 	t.Run("memtable-only", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -725,7 +725,7 @@ func replaceInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOpti
 	})
 
 	t.Run("with single flush in between updates", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -785,7 +785,7 @@ func replaceInsertAndDelete(ctx context.Context, t *testing.T, opts []BucketOpti
 	})
 
 	t.Run("with flushes after initial write and delete", func(t *testing.T) {
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -851,7 +851,7 @@ func replaceCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 		r := getRandomSeed()
 		dirName := t.TempDir()
 
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -1086,7 +1086,7 @@ func replaceCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 		r := getRandomSeed()
 		dirName := t.TempDir()
 
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -1180,7 +1180,7 @@ func replaceCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 		r := getRandomSeed()
 		dirName := t.TempDir()
 
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 
@@ -1471,7 +1471,7 @@ func replaceCursors(ctx context.Context, t *testing.T, opts []BucketOption) {
 	t.Run("with deletes as latest in some segments", func(t *testing.T) {
 		dirName := t.TempDir()
 
-		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), nil,
+		b, err := NewBucketCreator().NewBucket(ctx, dirName, "", nullLogger(), 
 			cyclemanager.NewCallbackGroupNoop(), cyclemanager.NewCallbackGroupNoop(), opts...)
 		require.Nil(t, err)
 

@@ -472,9 +472,7 @@ func (sg *SegmentGroup) count() int {
 }
 
 func (sg *SegmentGroup) shutdown(ctx context.Context) error {
-	if err := sg.compactionCallbackCtrl.Unregister(ctx); err != nil {
-		return fmt.Errorf("long-running compaction in progress: %w", ctx.Err())
-	}
+
 
 	// Lock acquirement placed after compaction cycle stop request, due to occasional deadlock,
 	// because compaction logic used in cycle also requires maintenance lock.
