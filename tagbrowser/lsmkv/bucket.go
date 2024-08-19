@@ -220,9 +220,6 @@ func (*Bucket) NewBucket(ctx context.Context, dir, rootDir string, logger logrus
 		return nil, err
 	}
 
-	id := "bucket/flush/" + b.dir
-	b.flushCallbackCtrl = flushCallbacks.Register(id, b.flushAndSwitchIfThresholdsMet)
-
 
 	if err := GlobalBucketRegistry.TryAdd(dir); err != nil {
 		// prevent accidentally trying to register the same bucket twice
