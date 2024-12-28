@@ -42,13 +42,6 @@ func (s *Store) PauseCompaction(ctx context.Context) error {
 func (s *Store) ResumeCompaction(ctx context.Context) error {
 	s.cycleCallbacks.compactionCallbacksCtrl.Activate()
 
-	// TODO common_cycle_manager maybe not necessary, or to be replaced with store pause stats
-	for _, b := range s.bucketsByName {
-		if b.pauseTimer != nil {
-			b.pauseTimer.ObserveDuration()
-		}
-	}
-
 	return nil
 }
 
