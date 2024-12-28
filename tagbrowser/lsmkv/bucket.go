@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/sirupsen/logrus"
 	"github.com/donomii/tagdb/tagbrowser/lsmkv/segmentindex"
 	"github.com/weaviate/weaviate/entities/cyclemanager"
@@ -85,8 +84,6 @@ type Bucket struct {
 	// produce a meaningful count. Typically, the only count we're interested in
 	// is that of the bucket that holds objects
 	monitorCount bool
-
-	pauseTimer *prometheus.Timer // Times the pause
 
 	// Whether tombstones (set/map/replace types) or deletions (roaringset type)
 	// should be kept in root segment during compaction process.
