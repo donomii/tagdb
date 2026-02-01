@@ -278,7 +278,7 @@ func stopServer() {
 
 var cpuprofile *string
 
-func StartServer() {
+func StartServer() *Manor {
 	var preAllocSize = 1000000
 	var config_location = "tagdb.conf"
 	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file")
@@ -304,5 +304,5 @@ func StartServer() {
 
 	go rpc_server(ServerAddress, manor)
 	rpcClient, _ = jsonrpc.Dial("tcp", ServerAddress)
-
+	return manor
 }

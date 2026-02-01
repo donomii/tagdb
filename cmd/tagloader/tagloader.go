@@ -39,12 +39,12 @@ func wantContent(aPath string, fileSize int64) bool {
 	if match {
 		return false
 	} else {
-        
-        if fileMatch.MatchString(aPath) {
-            return true
-        } else {
-            return false
-        }
+
+		if fileMatch.MatchString(aPath) {
+			return true
+		} else {
+			return false
+		}
 	}
 }
 
@@ -54,17 +54,18 @@ func DirWalk(directory string, aFunc func(string, string, string)) {
 		if debug {
 			log.Println("Recursing into ", path.Join(directory, dir))
 		}
+		fmt.Printf("importing %s\n", path.Join(directory, dir))
 		dirPath := path.Join(directory, dir)
 		//wg.Add(1)
 		DirWalk(dirPath, aFunc)
 	}
 	files, _ := dry.ListDirFiles(directory)
 	for _, file := range files {
-        filePath := path.Join(directory, file)
-        if debug {
-            log.Println("Calling user function on path ", path.Join(directory, file))
-        }
-        aFunc(filePath, directory, file)
+		filePath := path.Join(directory, file)
+		if debug {
+			log.Println("Calling user function on path ", path.Join(directory, file))
+		}
+		aFunc(filePath, directory, file)
 	}
 
 	//wg.Done()
@@ -130,25 +131,25 @@ func processFile(aPath string, fileNameFingerprint []string) {
 				//This probably isn't a text file
 				return
 			}
-            var lines []string
-            if everyLine {
-                lines = regexp.MustCompile("\\n|\\r\\n").Split(content, 99999)
-            } else {
-                lines = []string{content} //FIXME
-            }
+			var lines []string
+			if everyLine {
+				lines = regexp.MustCompile("\\n|\\r\\n").Split(content, 99999)
+			} else {
+				lines = []string{content} //FIXME
+			}
 			//var totalLines = 0
-            tagCount := 0
+			tagCount := 0
 			for number, l := range lines {
 
-				ff := tagbrowser.ReSplit([]string{"\n", " ", "/", ".", ",", "+", "_", "(", ")", "{", "}", "\"", "&", ";", ":", "-", "#", "!", "^", "'", "$", "=", "*", "[", "]", ">", "<", " ", "	","，", "。", "|", "」", "、", "「"}, []string{strings.ToLower(l)})
-                f := []string{}
-			    acceptableTag := regexp.MustCompile("^[a-zA-Z0-9]+$")
-                for _, v := range ff {
-                    if acceptableTag.Match([]byte(v)) {
-                        f = append(f, v)
-                    }
-                }
-                tagCount = tagCount + len(f)
+				ff := tagbrowser.ReSplit([]string{"\n", " ", "/", ".", ",", "+", "_", "(", ")", "{", "}", "\"", "&", ";", ":", "-", "#", "!", "^", "'", "$", "=", "*", "[", "]", ">", "<", " ", "	", "，", "。", "|", "」", "、", "「"}, []string{strings.ToLower(l)})
+				f := []string{}
+				acceptableTag := regexp.MustCompile("^[a-zA-Z0-9]+$")
+				for _, v := range ff {
+					if acceptableTag.Match([]byte(v)) {
+						f = append(f, v)
+					}
+				}
+				tagCount = tagCount + len(f)
 				f = append(f, fileNameFingerprint...)
 				insertRec(aPath, number+1, f)
 				//	totalLines = number
@@ -168,22 +169,21 @@ func makeArgs(aPath string, number int, f []string) *tagbrowser.InsertArgs {
 }
 
 func actuallyProcessFile(fullPath string) {
-    p := fullPath
-    var i int
-    for i = 0; i < 30; i++ {
-        p = tagbrowser.FragsRegex.ReplaceAllString(p, " ")
+	p := fullPath
+	var i int
+	for i = 0; i < 30; i++ {
+		p = tagbrowser.FragsRegex.ReplaceAllString(p, " ")
 
-    }
-    nf := strings.Fields(strings.ToLower(p))
-    if debug {
-        log.Printf("Inserting %v", strings.Join(nf, ","))
-    }
+	}
+	nf := strings.Fields(strings.ToLower(p))
+	if debug {
+		log.Printf("Inserting %v", strings.Join(nf, ","))
+	}
 
-    insertRec(fullPath, -1, nf)
+	insertRec(fullPath, -1, nf)
 
-    processFile(fullPath, nf)
+	processFile(fullPath, nf)
 }
-
 
 func processPaths(aCh chan []string) {
 	if debug {
@@ -195,7 +195,7 @@ func processPaths(aCh chan []string) {
 		if verbose {
 			//log.Println("Processing path ", fullPath)
 		}
-        actuallyProcessFile(fullPath)
+		actuallyProcessFile(fullPath)
 		wg.Done()
 	}
 }
@@ -260,14 +260,14 @@ func main() {
 	}
 	if debug {
 		log.Println("Printing extra debugging information")
-        if verbose {
-            log.Println("Printing files as they are loaded")
-        }
+		if verbose {
+			log.Println("Printing files as they are loaded")
+		}
 	}
 	if noContents {
 		log.Println("Ignoring file contents, only loading file names")
 	}
-    fileMatch = regexp.MustCompile(filePattern)
+	fileMatch = regexp.MustCompile(filePattern)
 	var err error
 	if loadFromArgs {
 		index, _ := strconv.ParseInt(dirs[1], 0, 0)
@@ -303,12 +303,13 @@ func main() {
 			if debug {
 				fmt.Printf("Scanning %v", searchDir)
 			}
-            if info, err := os.Stat(searchDir); err == nil && info.IsDir() {
-                wg.Add(1)
-                go scanDir(searchDir, pathsCh)
-            } else {
-                actuallyProcessFile(searchDir)
-            }
+			fmt.Printf("load files from %s\n", searchDir)
+			if info, err := os.Stat(searchDir); err == nil && info.IsDir() {
+				wg.Add(1)
+				go scanDir(searchDir, pathsCh)
+			} else {
+				actuallyProcessFile(searchDir)
+			}
 		}
 		wg.Wait()
 		//for true {

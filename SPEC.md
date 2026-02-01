@@ -51,8 +51,8 @@ graph TD
 
 | Binary | Description |
 |--------|-------------|
-| `tagserver` | The main database server. Listens for JSON-RPC requests on TCP port `6781`. Also launches a pprof server and a static file server. |
-| `tagloader` | Crawls directories and indexes files by sending `InsertRecord` RPC calls to the server. |
+| `tagserver` | The main database server. Listens for JSON-RPC requests on TCP port `6781`. Handles `SIGINT`/`SIGTERM` for graceful shutdown. |
+| `tagloader` | Crawls directories and indexes files. Provides verbose logging of progress. |
 | `tagquery` | Sends search queries or admin commands (shutdown, status) to the server. |
 | `tagshell` | An interactive terminal UI (using `termbox-go`) for searching. |
 | `fetchbot` | A web crawler (using `puerkitobio/fetchbot`) that indexes web pages. |
