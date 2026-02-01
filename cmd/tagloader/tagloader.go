@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"../../tagbrowser"
+	"github.com/donomii/tagdb/tagbrowser"
 	"github.com/ungerik/go-dry"
 )
 

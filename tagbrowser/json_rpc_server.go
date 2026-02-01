@@ -2,13 +2,15 @@
 
 package tagbrowser
 
-import "github.com/skratchdot/open-golang/open"
 import (
 	"bytes"
 	"io"
 	"log"
 	"net"
 	"net/http"
+
+	"github.com/skratchdot/open-golang/open"
+
 	_ "net/http/pprof"
 	"net/rpc"
 	"net/rpc/jsonrpc"
@@ -23,7 +25,7 @@ var shuttingDown bool = false
 
 func (t *TagResponder) Shutdown(args *Args, reply *SuccessReply) error {
 	shuttingDown = true
-	defaultManor.Shutdown()
+	t.Manor.Shutdown()
 	reply.Success = true
 	go func() {
 		time.Sleep(time.Second * 5.0)
@@ -59,8 +61,8 @@ func (t *TagResponder) TopTagsStatus(args *Args, reply *TopTagsReply) error {
 func (t *TagResponder) SearchString(args *Args, reply *Reply) error {
 
 	log.Printf("Query: '%v'", args.A)
-	if defaultManor != nil {
-		res := defaultManor.scanFileDatabase(args.A, args.Limit, false)
+	if t.Manor != nil {
+		res := t.Manor.scanFileDatabase(args.A, args.Limit, false)
 		reply.C = res
 	} else {
 	}
@@ -98,16 +100,16 @@ func (t *TagResponder) PredictString(args *Args, reply *StringListReply) error {
 }
 
 func (t *TagResponder) InsertRecord(args *InsertArgs, reply *SuccessReply) error {
-    if debug {
-        log.Println("Inserting record Handler", args)
-    }
+	if debug {
+		log.Println("Inserting record Handler", args)
+	}
 	//silo.LockMe()
 	//defer func() { silo.UnlockMe() }()
 
 	//f := makeFingerprint(args.Tags)
-	if defaultManor != nil && !shuttingDown {
+	if t.Manor != nil && !shuttingDown {
 		rec := RecordTransmittable{args.Name, args.Position, args.Tags}
-		defaultManor.SubmitRecord(rec)
+		t.Manor.SubmitRecord(rec)
 		reply.Success = true
 		reply.Reason = ""
 	} else {
@@ -121,24 +123,9 @@ func (t *TagResponder) InsertRecord(args *InsertArgs, reply *SuccessReply) error
 		}
 	}
 
-    if debug {
-        log.Println("Finished inserting record handler", reply)
-    }
-	return nil
-}
-
-func InsertRecord(args *InsertArgs, reply *SuccessReply) error {
-    if debug {
-        log.Println("Inserting record action", args)
-    }
-	rec := RecordTransmittable{args.Name, args.Position, args.Tags}
-	defaultManor.SubmitRecord(rec)
-
-	reply.Success = true
-	reply.Reason = ""
-    if debug {
-        log.Println("Finished inserting record action", reply)
-    }
+	if debug {
+		log.Println("Finished inserting record handler", reply)
+	}
 	return nil
 }
 
@@ -179,11 +166,11 @@ func (r *rpcRequest) Close() error {
 }
 
 // Call starts the RPC request, waits for it to complete, and returns the results.
-func (r *rpcRequest) Call() io.Reader {
+func (r *rpcRequest) Call(m *Manor) io.Reader {
 	if debug {
 		log.Printf("Processing json rpc request\n")
 	}
-	arith := new(TagResponder)
+	arith := &TagResponder{Manor: m}
 
 	server := rpc.NewServer()
 	server.Register(arith)
@@ -199,8 +186,8 @@ func (r *rpcRequest) Call() io.Reader {
 	return r.rw
 }
 
-func rpc_server(serverAddress string) {
-	arith := new(TagResponder)
+func rpc_server(serverAddress string, m *Manor) {
+	arith := &TagResponder{Manor: m}
 
 	server := rpc.NewServer()
 	server.Register(arith)
@@ -215,7 +202,12 @@ func rpc_server(serverAddress string) {
 	http.HandleFunc("/rpc", func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 		w.Header().Set("Content-Type", "application/json")
-		res := NewRPCRequest(req.Body).Call()
+		// We need to fix Call() to use the Manor.
+		// But Call() creates its own server!
+		// Let's Fix Call() to take an argument? Or just copy logic here.
+		// `NewRPCRequest(req.Body).Call()`
+		// I will update Call signature in a separate edit.
+		res := NewRPCRequest(req.Body).Call(m)
 		io.Copy(w, res)
 	})
 
@@ -238,19 +230,17 @@ func rpc_server(serverAddress string) {
 	go http.ListenAndServe(":8181", nil)
 	open.Start("http://localhost:8181/index.html")
 
-
-
 	for {
 		conn, err := l.Accept()
 		if err != nil {
 			log.Fatal(err)
 		}
 		if debug {
-		    log.Println("Got connection")
+			log.Println("Got connection")
 		}
 		go server.ServeCodec(jsonrpc.NewServerCodec(conn))
 		if debug {
-		    log.Println("Sent response, probably")
+			log.Println("Sent response, probably")
 		}
 	}
 

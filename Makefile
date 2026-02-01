@@ -1,6 +1,5 @@
 
 deps:
-	go get github.com/donomii/tagdb/tagbrowser/lsmkv/roaringsetrange
 	go get github.com/cornelk/hashmap
 	go get github.com/skratchdot/open-golang/open
 	go get github.com/ungerik/go-dry

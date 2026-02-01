@@ -8,7 +8,7 @@ import (
 	"encoding/gob"
 	"sync"
 
-
+	syncmap "github.com/donomii/genericsyncmap"
 	"github.com/tchap/go-patricia/patricia"
 )
 
@@ -52,7 +52,9 @@ type TopTagsReply struct {
 	TopTags map[string]int //The number of files the top 10 tags point to
 }
 
-type TagResponder int
+type TagResponder struct {
+	Manor *Manor
+}
 
 //Internal database
 
@@ -70,8 +72,8 @@ type tagSilo struct {
 	readMutex            sync.Mutex
 	trieMutex            sync.Mutex
 	counterMutex         sync.Mutex
-	checkpointMutex      sync.Mutex
-	counters             *Map[string, int]
+	checkpointMutex      *sync.Mutex
+	counters             *syncmap.SyncMap[string, int]
 	next_string_index    int
 	last_tag_record      int
 	string_table         *patricia.Trie
@@ -87,11 +89,11 @@ type tagSilo struct {
 	maxRecords           int
 	Operational          bool
 	ReadOnly             bool
-	string_cache         *Map[int, string]
+	string_cache         *syncmap.SyncMap[int, string]
 	//symbol_cache         map[string]int
-	symbol_cache *Map[string, int]
-	tag_cache    *Map[int, []int]
-	record_cache *Map[int, record]
+	symbol_cache *syncmap.SyncMap[string, int]
+	tag_cache    *syncmap.SyncMap[int, []int]
+	record_cache *syncmap.SyncMap[int, record]
 	threadsWait  sync.WaitGroup
 	dirty        bool
 	LockLog      chan string
@@ -173,31 +175,3 @@ type SiloStore interface {
 type SqlStore struct {
 	Db *sql.DB
 }
-
-type Map[K comparable, V any] struct {
-	m sync.Map
-}
-
-func (m *Map[K, V]) Delete(key K) { m.m.Delete(key) }
-func (m *Map[K, V]) Load(key K) (value V, ok bool) {
-	v, ok := m.m.Load(key)
-	if !ok {
-		return value, ok
-	}
-	return v.(V), ok
-}
-func (m *Map[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
-	v, loaded := m.m.LoadAndDelete(key)
-	if !loaded {
-		return value, loaded
-	}
-	return v.(V), loaded
-}
-func (m *Map[K, V]) LoadOrStore(key K, value V) (actual V, loaded bool) {
-	a, loaded := m.m.LoadOrStore(key, value)
-	return a.(V), loaded
-}
-func (m *Map[K, V]) Range(f func(key K, value V) bool) {
-	m.m.Range(func(key, value any) bool { return f(key.(K), value.(V)) })
-}
-func (m *Map[K, V]) Store(key K, value V) { m.m.Store(key, value) }

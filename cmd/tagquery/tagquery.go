@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"../../tagbrowser"
+	"github.com/donomii/tagdb/tagbrowser"
 )
 
 func search(terms []string, displayFingerprint bool) {

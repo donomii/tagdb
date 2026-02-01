@@ -67,7 +67,7 @@ func monitorSilosWorker(f *Farm) {
 				}
 			}
 			if total_silos < f.maxSilos {
-				aSilo := createSilo(f.memory_only, f.maxSilos, fmt.Sprintf("%v", len(f.silos)), 0, f.recordCh, f.location, f.permanentStoreCh, f.temporary, f.maxRecords, f.checkpointMutex, f.LogChan)
+				aSilo := createSilo(f.memory_only, f.maxSilos, fmt.Sprintf("%v", len(f.silos)), 0, f.recordCh, f.location, f.permanentStoreCh, f.temporary, f.maxRecords, &f.checkpointMutex, f.LogChan)
 				aSilo.LockLog = f.LockLog
 				aSilo.LogChan = f.LogChan
 				if f.temporary {
@@ -128,7 +128,7 @@ func createFarm(location string, number_of_silos int, inputchan chan RecordTrans
 
 	if !f.temporary {
 		for i := 0; i < number_of_silos; i++ {
-			aSilo := createSilo(memory_only, f.maxSilos, fmt.Sprintf("%v", i), 10, f.recordCh, location, permanentStoreCh, isTemporary, f.maxRecords, f.checkpointMutex, f.LogChan)
+			aSilo := createSilo(memory_only, f.maxSilos, fmt.Sprintf("%v", i), 10, f.recordCh, location, permanentStoreCh, isTemporary, f.maxRecords, &f.checkpointMutex, f.LogChan)
 			aSilo.LockLog = f.LockLog
 			aSilo.LogChan = f.LogChan
 			//aSilo.test() FIXME
@@ -161,14 +161,15 @@ func equalPrints(s1, s2 []string) bool {
 func (f *Farm) scanFileDatabase(searchString string, maxResults int, exactMatch bool) []ResultRecordTransmittable {
 	results := ResultRecordTransmittableCollection{}
 	resLock := sync.Mutex{}
-	resLock.Lock()
-	pending := 0
+	var wg sync.WaitGroup
+
 	for i, aSilo := range f.silos {
 		if debug {
 			log.Printf("Searching Silo: %v - %v", f.location, i)
 		}
-		pending = pending + 1
+		wg.Add(1)
 		go func(aSilo *tagSilo) {
+			defer wg.Done()
 			if debug {
 				log.Printf("Starting search\n")
 			}
@@ -184,18 +185,13 @@ func (f *Farm) scanFileDatabase(searchString string, maxResults int, exactMatch 
 					results = append(results, r)
 					sort.Sort(results)
 					if results.Len() > maxResults {
-						results = results[0 : maxResults-1]
+						results = results[0:maxResults]
 					}
 				}
 			}
-
-			pending = pending - 1
 		}(aSilo)
 	}
 
-	resLock.Unlock()
-	for i := 0; pending > 0; i = i + 1 {
-		time.Sleep(10.0 * time.Millisecond)
-	}
+	wg.Wait()
 	return results
 }
